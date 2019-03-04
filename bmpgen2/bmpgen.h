@@ -56,6 +56,7 @@
 #define IDC_REP         125
 #define IDC_INPUT       126
 #define IDC_OUTPUT      127
+#define IDC_ENCODING	128
 
 #define IDC_BITMAP      130   // preview
 
@@ -68,12 +69,12 @@
 // -------------------- prototypes of functions ------------------
 extern   HANDLE   hInstance;
 
-BOOL     RepLoad( HWND hwndParent, LPWSTR dirname, int FileOff );
+BOOL     RepLoad( HWND hwndParent, LPWSTR dirname, DWORD encoding, int FileOff );
 
-BOOL     MapLoad( HWND hwndParent, LPWSTR dirname, int FileOff );
+BOOL     MapLoad( HWND hwndParent, LPWSTR dirname, DWORD encoding, int FileOff );
 
 int     MapDraw(
-   HDC hdc, wchar_t *fname, UINT width, UINT height, int dpix, int dpiy,
+   HDC hdc, wchar_t *fname, DWORD encoding, UINT width, UINT height, int dpix, int dpiy,
    int marksize, LPLOGFONT lplfMark, int lfMarkSize,
    int repsize, LPLOGFONT lplfRep, int lfRepSize,
    BOOL  fMetric

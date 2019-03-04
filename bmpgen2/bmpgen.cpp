@@ -11,9 +11,13 @@ static wchar_t    szFontMarkSize[] = L"Font Mrk.Size";
 static wchar_t    szFontRepName[] = L"Font Rep.Name";
 static wchar_t    szFontRepSize[] = L"Font Rep.Size";
 static wchar_t    szInDir[] = L"DAT File";
+static wchar_t    szInEncoding[] = L"DAT Encoding";
 static wchar_t    szOutDir[] = L"BMP File";
 static wchar_t    szArcDir[] = L"ARC directory";
+static wchar_t    szArcEncoding[] = L"ARC Encoding";
 static wchar_t    szRepDir[] = L"REP directory";
+static wchar_t    szRepEncoding[] = L"REP Encoding";
+static wchar_t    *szEncodings[] = { L"OEM", L"ANSI", L"UTF8" };
 static wchar_t    szMrk[] = L"Mrk.Size";
 static wchar_t    szRep[] = L"Rep.Size";
 static wchar_t    szHeight[] = L"Image Height";
@@ -255,7 +259,7 @@ static LPDIB CreateDIBfromDDB( HDC hdc, HBITMAP hbmp, UINT DPIX = 96, UINT DPIY 
 // ----------------------- fill wanted map ------------------------------
 static BOOL OnBmpQueryNewPalette( HWND hwnd );
 
-static HBITMAP FillMap( LPWSTR infile, UINT width, UINT height, int marksize, int repsize ) {
+static HBITMAP FillMap( LPWSTR infile, DWORD encoding, UINT width, UINT height, int marksize, int repsize ) {
    HDC      hcdc = (HDC)0L;
    HBITMAP  hbmp = (HBITMAP)0L, hbmpold;
 
@@ -275,7 +279,7 @@ static HBITMAP FillMap( LPWSTR infile, UINT width, UINT height, int marksize, in
    PatBlt( hcdc, 0,0, width,height, PATCOPY );                 // fill white
    
    if ( !MapDraw(
-      hcdc, infile,
+      hcdc, infile, encoding,
       width, height, dpix, dpiy,
       marksize, &lfMark, lfMarkSize,
       repsize, &lfRep, lfRepSize,
@@ -655,16 +659,18 @@ static void OnDlgCommandAuto( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
 
 
 static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
-   wchar_t     infile[ 256 ];
-   wchar_t     outfile[ 256 ];
+   wchar_t     infile[ 1024 ];
+   wchar_t     outfile[ 1024 ];
    LPDIB       lpb;
    LONG        cx, cy;
    HBITMAP     hbmp;
+   DWORD       encoding;
    UNUSED_ARG( codeNotify );
 
    Button_Enable( hwndCtl, FALSE );
    // check source data
    GetDlgItemText( hwnd, IDC_INPUT, infile, sizeof(infile)/sizeof(infile[0]) );
+   encoding = GetDlgItemInt( hwnd, IDC_ENCODING, NULL, FALSE );
    GetDlgItemText( hwnd, IDC_OUTPUT, outfile, sizeof(outfile)/sizeof(outfile[0]) );
    if ( !infile[0] ) {
       MessageBox( hwnd, L"You must specify input file", bmpgen, MB_OK|MB_ICONEXCLAMATION );
@@ -709,7 +715,7 @@ static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
    }
 
    hbmp = FillMap(
-      infile, (UINT)cx, (UINT)cy,
+      infile, encoding, (UINT)cx, (UINT)cy,
       (int)GetDlgItemInt( hwnd, IDC_MARKSIZE, NULL, FALSE ),
       (int)GetDlgItemInt( hwnd, IDC_REPSIZE, NULL, FALSE )
    );
@@ -739,8 +745,16 @@ static void OnDlgCommandGetMap( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
    if ( !ofn.lStructSize ) {
       // structure was not initialized
       ofn.lStructSize =       sizeof( ofn );
-      ofn.lpstrFilter =       L"Arc files\0*.arc\0";
-      ofn.nFilterIndex =      1;
+      ofn.lpstrFilter =       L"OEM Arc files\0*.arc\0ANSI Arc files\0*.arc\0UTF8 files\0*.arc\0";
+      GetPrivateProfileString( szOpt, szArcEncoding, L"OEM", dir, sizeof(dir)/sizeof(dir[0]), szIni );
+      if ( !_wcsicmp( dir, L"UTF8" ) ) {
+         ofn.nFilterIndex =      3;
+      } else if ( !_wcsicmp( dir, L"ANSI" ) ) {
+         ofn.nFilterIndex =      2;
+      } else {
+         ofn.nFilterIndex =      1;
+      }
+      dir[0] = L'\0';
       ofn.lpstrTitle =        L"Select wanted .ARC files";
       ofn.Flags =             OFN_LONGNAMES | OFN_ALLOWMULTISELECT | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER;
    }
@@ -754,8 +768,9 @@ static void OnDlgCommandGetMap( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
    if ( GetOpenFileName( &ofn ) ) {
       // proccess selected files
       FreeAllArcFiles();
-      SetDlgItemText( hwnd, IDC_MAP, MapLoad( hwnd, fname, ofn.nFileOffset ) ? fname : L"" );
+      SetDlgItemText( hwnd, IDC_MAP, MapLoad( hwnd, fname, ofn.nFilterIndex, ofn.nFileOffset ) ? fname : L"" );
       WritePrivateProfileString( szOpt, szArcDir, fname, szIni );
+      WritePrivateProfileString( szOpt, szArcEncoding, szEncodings[ 0 < ofn.nFilterIndex && ofn.nFilterIndex < 4 ? ofn.nFilterIndex - 1 : 0 ], szIni );
       CheckDlgItems( hwnd );
    }
 }
@@ -771,8 +786,16 @@ static void OnDlgCommandGetRep( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
    if ( !ofn.lStructSize ) {
       // structure was not initialized
       ofn.lStructSize =       sizeof( ofn );
-      ofn.lpstrFilter =       L"REP files\0*.rep\0";
-      ofn.nFilterIndex =      1;
+      ofn.lpstrFilter =       L"OEM REP files\0*.rep\0ANSI REP files\0*.rep\0UTF8 REP files\0*.rep\0";
+      GetPrivateProfileString( szOpt, szRepEncoding, L"OEM", dir, sizeof(dir)/sizeof(dir[0]), szIni );
+      if ( !_wcsicmp( dir, L"UTF8" ) ) {
+         ofn.nFilterIndex =      3;
+      } else if ( !_wcsicmp( dir, L"ANSI" ) ) {
+         ofn.nFilterIndex =      2;
+      } else {
+         ofn.nFilterIndex =      1;
+      }
+      dir[0] = L'\0';
       ofn.lpstrTitle =        L"Select wanted .REP files";
       ofn.Flags =             OFN_ALLOWMULTISELECT | OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_ENABLESIZING | OFN_EXPLORER;
    }
@@ -787,8 +810,9 @@ static void OnDlgCommandGetRep( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
 
    if ( GetOpenFileName( &ofn ) ) {
       // proccess selected files
-      SetDlgItemText( hwnd, IDC_REP, RepLoad( hwnd, fname, ofn.nFileOffset ) ? fname : L"" );
+      SetDlgItemText( hwnd, IDC_REP, RepLoad( hwnd, fname, ofn.nFilterIndex, ofn.nFileOffset ) ? fname : L"" );
       WritePrivateProfileString( szOpt, szRepDir, fname, szIni );
+      WritePrivateProfileString( szOpt, szRepEncoding, szEncodings[ 0 < ofn.nFilterIndex && ofn.nFilterIndex < 4 ? ofn.nFilterIndex - 1 : 0 ], szIni );
       CheckDlgItems( hwnd );
    } else {
       SetDlgItemText( hwnd, IDC_REP, L"" );
@@ -807,8 +831,16 @@ static void OnDlgCommandGetInput( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
    if ( !ofn.lStructSize ) {
       // structure was not initialized
       ofn.lStructSize =       sizeof( ofn );
-      ofn.lpstrFilter =       L"Input files\0*.dat\0";
-      ofn.nFilterIndex =      1;
+      ofn.lpstrFilter =       L"OEM Input files\0*.dat\0ANSI Input files\0*.dat\0UTF8 Input files\0*.dat\0";
+      GetPrivateProfileString( szOpt, szInEncoding, L"OEM", dir, sizeof(dir)/sizeof(dir[0]), szIni );
+      if ( !_wcsicmp( dir, L"UTF8" ) ) {
+         ofn.nFilterIndex =      3;
+      } else if ( !_wcsicmp( dir, L"ANSI" ) ) {
+         ofn.nFilterIndex =      2;
+      } else {
+         ofn.nFilterIndex =      1;
+      }
+      dir[0] = L'\0';
       ofn.lpstrTitle =        L"Choose/enter input file";
       ofn.Flags =             OFN_NOTESTFILECREATE | OFN_ENABLESIZING | OFN_EXPLORER;
    }
@@ -829,7 +861,9 @@ static void OnDlgCommandGetInput( HWND hwnd, HWND hwndCtl, UINT codeNotify ) {
    if ( GetOpenFileName( &ofn ) ) {
       // set input file
       SetDlgItemText( hwnd, IDC_INPUT, fname );
+      SetDlgItemInt( hwnd, IDC_ENCODING, ofn.nFilterIndex, FALSE );
       WritePrivateProfileString( szOpt, szInDir, fname, szIni );
+      WritePrivateProfileString( szOpt, szInEncoding, szEncodings[ 0 < ofn.nFilterIndex && ofn.nFilterIndex < 4 ? ofn.nFilterIndex - 1 : 0 ], szIni );
       CheckDlgItems( hwnd );
    }
 }

@@ -841,6 +841,7 @@
 #define WM_GETICON                      0x007F
 #define LANG_INVARIANT                  0x7f
 #define IDC_OUTPUT                      127
+#define IDC_ENCODING			128
 #define VK_F17                          0x80
 #define WM_SETICON                      0x0080
 #define WVR_ALIGNRIGHT                  0x0080

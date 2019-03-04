@@ -107,7 +107,7 @@ LONG WINAPI ResProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
 }
    
 
-BOOL  MapLoad( HWND hwndParent, LPWSTR dirname, int off )
+BOOL  MapLoad( HWND hwndParent, LPWSTR dirname, DWORD encoding, int off )
 {
 	dirname_ptr = dirname;
 	dirname_off = off;
@@ -117,7 +117,7 @@ BOOL  MapLoad( HWND hwndParent, LPWSTR dirname, int off )
 
 
 // ------------------------------------ .rep files ------------------------------------------
-BOOL  RepLoad( HWND hwnd, LPWSTR dirname, int off )
+BOOL  RepLoad( HWND hwnd, LPWSTR dirname, DWORD encoding, int off )
 {
 	BOOL      a = FALSE;
 	LPWSTR    p;
@@ -222,7 +222,7 @@ static void DrawOutline( HDC hdc, outlinesegment_P lpa, geopoint_P lpp ) {
 
 
 int MapDraw(
-   HDC hdc, wchar_t *fname, UINT width, UINT height, int dpix, int dpiy,
+   HDC hdc, wchar_t *fname, DWORD encoding, UINT width, UINT height, int dpix, int dpiy,
    int marksize, LPLOGFONT lplf, int lfSize,
    int repsize, LPLOGFONT lplfRep, int lfRepSize,
    BOOL fMetric

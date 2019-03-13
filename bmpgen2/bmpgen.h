@@ -9,20 +9,20 @@
 #include <windows.h>
 
 #ifndef RESOURCE_FILE
-   #include <commdlg.h>
-   #include <windowsx.h>
-   #include <io.h>
-   #include <stdio.h>
-   #include <math.h>
+#include <commdlg.h>
+#include <windowsx.h>
+#include <io.h>
+#include <stdio.h>
+#include <math.h>
 #endif
 
 #define  UNUSED_ARG(arg)   (arg)=(arg)
 
 #ifndef OF_READ
-   #define  OF_READ  READ
+#define  OF_READ  READ
 #endif
 #ifndef OF_WRITE
-   #define  OF_WRITE WRITE
+#define  OF_WRITE WRITE
 #endif
 
 #define BMPCLASS        "Bitmap Window"
@@ -69,15 +69,15 @@
 // -------------------- prototypes of functions ------------------
 extern   HANDLE   hInstance;
 
-BOOL     RepLoad( HWND hwndParent, LPWSTR dirname, DWORD encoding, int FileOff );
+BOOL     RepLoad( HWND hwndParent, LPWSTR dirname, UINT encoding, int FileOff );
 
-BOOL     MapLoad( HWND hwndParent, LPWSTR dirname, DWORD encoding, int FileOff );
+BOOL     MapLoad( HWND hwndParent, LPWSTR dirname, UINT encoding, int FileOff );
 
 int     MapDraw(
-   HDC hdc, wchar_t *fname, DWORD encoding, UINT width, UINT height, int dpix, int dpiy,
-   int marksize, LPLOGFONT lplfMark, int lfMarkSize,
-   int repsize, LPLOGFONT lplfRep, int lfRepSize,
-   BOOL  fMetric
+	HDC hdc, wchar_t *fname, UINT encoding, UINT width, UINT height, int dpix, int dpiy,
+	int marksize, LPLOGFONT lplfMark, int lfMarkSize,
+	int repsize, LPLOGFONT lplfRep, int lfRepSize,
+	BOOL  fMetric
 );
 
 LONG	WINAPI	ResProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam );

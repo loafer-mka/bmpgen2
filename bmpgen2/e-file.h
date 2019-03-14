@@ -1,9 +1,6 @@
 #pragma once
 
-#include <stdio.h>
-#include <stdint.h>
-#include <string.h>
-#include <Windows.h>
+#include "stdafx.h"
 
 #define LINE_BUFFER_SIZE	1024
 

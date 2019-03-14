@@ -1,6 +1,4 @@
-#ifndef _CRT_SECURE_NO_WARNINGS
-#	define _CRT_SECURE_NO_WARNINGS
-#endif
+#include "stdafx.h"
 #include "e-file.h"
 
 int e_fopen( struct EFILE *ep, wchar_t *fname, UINT encoding )
@@ -13,7 +11,7 @@ int e_fopen( struct EFILE *ep, wchar_t *fname, UINT encoding )
 		mode = L"rb";
 		break;
 	case CP_UTF8:	    // UTF8
-		mode = L"rb, ccs=UTF-8";
+		mode = L"rt, ccs=UTF-8";
 		break;
 	}
 	ep->fp = _wfopen( fname, mode );
@@ -41,7 +39,9 @@ wchar_t *e_fgets( wchar_t *buf, UINT size, struct EFILE *ep )
 	if ( !p ) return NULL;
 	temp[ sz - 1 ] = '\0';
 	sz = strlen( temp ) + 1;
-	MultiByteToWideChar( ep->encoding, MB_PRECOMPOSED, temp, sz, buf, size );
+	if ( !MultiByteToWideChar( ep->encoding, 0, temp, sz, buf, size ) ) {
+		volatile DWORD	dw = GetLastError();
+	}
 	return buf;
 }
 

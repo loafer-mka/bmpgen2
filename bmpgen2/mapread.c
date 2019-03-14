@@ -1,7 +1,4 @@
-#define _CRT_SECURE_NO_WARNINGS
-#include <stdio.h>
-#include <errno.h>
-#include <string.h>
+#include "stdafx.h"
 #include "bmpgen.h"
 #include "e-file.h"
 

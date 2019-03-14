@@ -1,7 +1,4 @@
-#ifndef _WIN32_WINNT
-#	define _WIN32_WINNT	0x0500
-#endif
-#include <stdarg.h>
+#include "stdafx.h"
 
 typedef double	geo_t;
 #define		geo_0		((geo_t)0.0)
@@ -95,6 +92,8 @@ int		iround( double );
 geo_t		atogeo( wchar_t *str );
 wchar_t		*geotoa( geo_t v );
 wchar_t		*spatialtoa( geo_t v );
+
+wchar_t		*wcs_place( wchar_t **pbuf, size_t *pcount, wchar_t *src );
 
 int		AddRepFile( wchar_t *filename, DWORD encoding );
 void		FreeAllRepFiles( void );

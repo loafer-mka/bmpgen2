@@ -1,20 +1,31 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio 2012
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmpgen2", "bmpgen2\bmpgen2.vcxproj", "{31589557-F061-48EB-B13C-C591E314CD50}"
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.438
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "bmpgen2", "bmpgen2\bmpgen2.vcxproj", "{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
-		Debug|Win32 = Debug|Win32
-		Release|Win32 = Release|Win32
+		Debug|x64 = Debug|x64
+		Debug|x86 = Debug|x86
+		Release|x64 = Release|x64
+		Release|x86 = Release|x86
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
-		{31589557-F061-48EB-B13C-C591E314CD50}.Debug|Win32.ActiveCfg = Debug|Win32
-		{31589557-F061-48EB-B13C-C591E314CD50}.Debug|Win32.Build.0 = Debug|Win32
-		{31589557-F061-48EB-B13C-C591E314CD50}.Release|Win32.ActiveCfg = Release|Win32
-		{31589557-F061-48EB-B13C-C591E314CD50}.Release|Win32.Build.0 = Release|Win32
+		{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}.Debug|x64.ActiveCfg = Debug|x64
+		{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}.Debug|x64.Build.0 = Debug|x64
+		{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}.Debug|x86.ActiveCfg = Debug|Win32
+		{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}.Debug|x86.Build.0 = Debug|Win32
+		{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}.Release|x64.ActiveCfg = Release|x64
+		{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}.Release|x64.Build.0 = Release|x64
+		{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}.Release|x86.ActiveCfg = Release|Win32
+		{480E44AF-6219-4B4A-9B4D-5B4C7129E69D}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {5BE55ACD-8147-4E1E-978E-B1E619CCDEEA}
 	EndGlobalSection
 EndGlobal

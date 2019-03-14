@@ -1,20 +1,15 @@
+#pragma once
 
-#ifndef _CRT_SECURE_NO_WARNINGS
-#	define _CRT_SECURE_NO_WARNINGS
-#endif
-#ifndef _WIN32_WINNT
-#	define _WIN32_WINNT	0x0500
-#endif
+#include "resource.h"
+#include "stdafx.h"
 
-#include <windows.h>
+//#include <io.h>
+//#include <stdio.h>
+//#include <math.h>
 
-#ifndef RESOURCE_FILE
-#include <commdlg.h>
-#include <windowsx.h>
-#include <io.h>
-#include <stdio.h>
-#include <math.h>
-#endif
+#define BMPCLASS        "Bitmap Window"
+#define DLGCLASS        "Bitmap Generator"
+#define RESCLASS        "Result dialog"
 
 #define  UNUSED_ARG(arg)   (arg)=(arg)
 
@@ -25,45 +20,9 @@
 #define  OF_WRITE WRITE
 #endif
 
-#define BMPCLASS        "Bitmap Window"
-#define DLGCLASS        "Bitmap Generator"
-#define RESCLASS        "Result dialog"
-
 #define INCH            25397L         // 25.397 mm per inch (x1000)
 #define PPI             72             // 72 points per inch
 
-#define IDC_PRINTER     100
-#define IDC_X           101
-#define IDC_DPIX        102
-#define IDC_Y           103
-#define IDC_DPIY        104
-#define IDC_UNITS       105
-#define IDC_MARKSIZE    106
-#define IDC_REPSIZE     107
-#define IDC_MARKFONT    108
-#define IDC_REPFONT     109
-
-#define IDC_READ        110
-#define IDC_AUTO        111
-
-#define IDC_UPDPICTURE  112
-
-#define IDC_GETMAP      120
-#define IDC_GETREP      121
-#define IDC_GETINPUT    122
-#define IDC_GETOUTPUT   123
-#define IDC_MAP         124
-#define IDC_REP         125
-#define IDC_INPUT       126
-#define IDC_OUTPUT      127
-#define IDC_ENCODING	128
-
-#define IDC_BITMAP      130   // preview
-
-#define IDC_RESULTS     140   // results of reading
-
-
-// ----------------------- structures ----------------------
 #include "geo.h"
 
 // -------------------- prototypes of functions ------------------

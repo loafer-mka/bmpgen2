@@ -1,5 +1,10 @@
+﻿// bmpgen2.cpp : Определяет точку входа для приложения.
+//
 
+#include "stdafx.h"
 #include "bmpgen.h"
+
+#define MAX_LOADSTRING 100
 
 HANDLE            hInstance;
 
@@ -1227,7 +1232,7 @@ LONG WINAPI DlgProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
 }
 
 
-int PASCAL WinMain( HINSTANCE hInst, HINSTANCE hPrev, LPSTR lpszCmd, int nCmdShow )
+int APIENTRY wWinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hPrev, _In_ LPWSTR lpszCmd, _In_ int nCmdShow )
 {
 	WNDCLASS       wc;
 	UNUSED_ARG( lpszCmd );

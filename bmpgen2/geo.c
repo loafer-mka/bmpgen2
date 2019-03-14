@@ -1,13 +1,4 @@
-#ifndef _CRT_SECURE_NO_WARNINGS
-#	define _CRT_SECURE_NO_WARNINGS
-#endif
-
-#include <errno.h>
-#include <ctype.h>
-#include <math.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <windows.h>
+#include "stdafx.h"
 #include "geo.h"
 #include "e-file.h"
 
@@ -155,6 +146,31 @@ wchar_t	*spatialtoa( geo_t x )
 }
 
 
+wchar_t *wcs_place( wchar_t **pbuf, size_t *pcount, wchar_t *src )
+{
+	wchar_t		*ps = *pbuf;
+	size_t		len;
+
+	if ( *src && 0 != *pcount ) {
+		len = wcslen( src ) + 1;
+		if ( *pcount >= len ) {
+			wcscpy( ps, src );
+			*pbuf = ps + len;
+			*pcount -= len;
+		} else {
+			len = *pcount;
+			if ( len > 1 ) wcsncpy( ps, src, len - 1 );
+			*pbuf += len;
+			*pcount = 0U;
+		}
+	} else {
+		ps = (wchar_t*)0;
+	}
+	return ps;
+
+}
+
+
 int AddRepFile( wchar_t *fname, DWORD encoding )
 {
 	/* file.rep syntax:
@@ -213,6 +229,7 @@ int AddRepFile( wchar_t *fname, DWORD encoding )
 	prp = (reppoint_P)( pri + 1 );
 	ps = (wchar_t*)( prp + cnt );
 	sz -= sizeof( repfile_t ) + cnt * sizeof( reppoint_t );
+	sz /= sizeof( wchar_t );
 
 	e_fseek( &ef, 0L, SEEK_SET );
 	while ( !e_feof( &ef ) ) {
@@ -231,15 +248,7 @@ int AddRepFile( wchar_t *fname, DWORD encoding )
 		if ( '\0' == *p ) continue;	/* skip strange line */
 		p = nextw( p );					/* name */
 		trimline( p );
-		if ( *p ) {
-			len = ( wcslen( ps ) + 1 ) * sizeof( *p );
-			prp->name = ps;
-			wcscpy( ps, p );
-			ps += len;
-			sz -= len;
-		} else {
-			prp->name = (wchar_t*)0;			/* empty name */
-		}
+		prp->name = wcs_place( &ps, &sz, p );
 		if ( prp->dp > pri->dp ) pri->dp = prp->dp;
 		prp++;
 		--cnt;

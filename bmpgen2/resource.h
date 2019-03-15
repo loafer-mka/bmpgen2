@@ -3,11 +3,6 @@
 // Используется bmpgen.rc
 //
 #define IDS_APP_TITLE                   103
-//#define IDM_ABOUT                       104
-//#define IDI_BMPGEN2                     107
-//#define IDI_SMALL                       108
-//#define IDC_BMPGEN2                     109
-//#define IDR_MAINFRAME                   128
 #define IDC_READ                        1000
 #define IDC_GETMAP                      1001
 #define IDC_MAP                         1002
@@ -29,11 +24,10 @@
 #define IDC_REPFONT                     1019
 #define IDC_AUTO                        1020
 #define IDC_UPDPICTURE                  1021
-#define IDC_ENCODING                    1022
-#define IDC_BITMAP                      1023
-
+#define IDC_BPP                         1022
+#define IDC_ENCODING                    1023
+#define IDC_BITMAP                      1024
 #define IDC_RESULTS                     1040
-
 #define IDC_STATIC                      -1
 
 // Next default values for new objects

@@ -1,6 +1,6 @@
-#include "stdafx.h"
 #include "bmpgen.h"
 #include "e-file.h"
+#include "dib.h"
 
 // ----------------------- static data ------------------
 static wchar_t		mapread[] = L"Map Reader";
@@ -95,13 +95,13 @@ static void OnResCommand( HWND hwnd, int id, HWND hwndCtl, UINT codeNotify )
 LONG WINAPI ResProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
 {
 	switch ( wmsg ) {
-	case WM_USER + 1000:   
+	case WM_USER + 1000:
 		return OnResStart( hwnd, GetDlgItem( hwnd, IDC_RESULTS ) );
-	HANDLE_MSG( hwnd, WM_CREATE, OnResCreate );
-	HANDLE_MSG( hwnd, WM_COMMAND, OnResCommand );
-	HANDLE_MSG( hwnd, WM_ERASEBKGND, OnDlgEraseBkgnd );
-	HANDLE_MSG( hwnd, WM_CTLCOLORBTN, OnDlgCtlColor );
-	HANDLE_MSG( hwnd, WM_CTLCOLORSTATIC, OnDlgCtlColor );
+		HANDLE_MSG( hwnd, WM_CREATE, OnResCreate );
+		HANDLE_MSG( hwnd, WM_COMMAND, OnResCommand );
+		HANDLE_MSG( hwnd, WM_ERASEBKGND, OnDlgEraseBkgnd );
+		HANDLE_MSG( hwnd, WM_CTLCOLORBTN, OnDlgCtlColor );
+		HANDLE_MSG( hwnd, WM_CTLCOLORSTATIC, OnDlgCtlColor );
 	}
 	return DefDlgProc( hwnd, wmsg, wParam, lParam );
 }
@@ -509,26 +509,26 @@ int MapDraw(
 			Rectangle( hdc, iround( p.x - v * Dmx ), iround( p.y - v * Dmy ), iround( p.x + v * Dmx ), iround( p.y + v * Dmy ) );
 			break;
 		case 3: case 13:/* 3 = rhomb */
-		{
-			POINT	apts[ 4 ];
-			v *= 1.4142135623730950488016887242097 * 0.886227;
-			apts[ 0 ].x = iround( p.x - v * Dmx );	apts[ 0 ].y = iround( p.y );
-			apts[ 1 ].x = iround( p.x );		apts[ 1 ].y = iround( p.y - v * Dmy );
-			apts[ 2 ].x = iround( p.x + v * Dmx );	apts[ 2 ].y = iround( p.y );
-			apts[ 3 ].x = iround( p.x );		apts[ 3 ].y = iround( p.y + v * Dmy );
-			Polygon( hdc, apts, 4 );
-		}
-		break;
+			{
+				POINT	apts[ 4 ];
+				v *= 1.4142135623730950488016887242097 * 0.886227;
+				apts[ 0 ].x = iround( p.x - v * Dmx );	apts[ 0 ].y = iround( p.y );
+				apts[ 1 ].x = iround( p.x );		apts[ 1 ].y = iround( p.y - v * Dmy );
+				apts[ 2 ].x = iround( p.x + v * Dmx );	apts[ 2 ].y = iround( p.y );
+				apts[ 3 ].x = iround( p.x );		apts[ 3 ].y = iround( p.y + v * Dmy );
+				Polygon( hdc, apts, 4 );
+			}
+			break;
 		case 4: case 14:/* 4 = triangle */
-		{
-			POINT	apts[ 3 ];
-			v *= 1.1026578096528985289355763961921;
-			apts[ 0 ].x = iround( p.x - v * Dmx );	apts[ 0 ].y = iround( p.y + 2 * 0.2887*v*Dmy );
-			apts[ 1 ].x = iround( p.x );		apts[ 1 ].y = iround( p.y - 2 * 0.57735*v*Dmy );
-			apts[ 2 ].x = iround( p.x + v * Dmx );	apts[ 2 ].y = iround( p.y + 2 * 0.2887*v*Dmy );
-			Polygon( hdc, apts, 3 );
-		}
-		break;
+			{
+				POINT	apts[ 3 ];
+				v *= 1.1026578096528985289355763961921;
+				apts[ 0 ].x = iround( p.x - v * Dmx );	apts[ 0 ].y = iround( p.y + 2 * 0.2887*v*Dmy );
+				apts[ 1 ].x = iround( p.x );		apts[ 1 ].y = iround( p.y - 2 * 0.57735*v*Dmy );
+				apts[ 2 ].x = iround( p.x + v * Dmx );	apts[ 2 ].y = iround( p.y + 2 * 0.2887*v*Dmy );
+				Polygon( hdc, apts, 3 );
+			}
+			break;
 		}
 	}
 

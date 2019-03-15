@@ -3,10 +3,6 @@
 #include "resource.h"
 #include "stdafx.h"
 
-//#include <io.h>
-//#include <stdio.h>
-//#include <math.h>
-
 #define BMPCLASS        "Bitmap Window"
 #define DLGCLASS        "Bitmap Generator"
 #define RESCLASS        "Result dialog"
@@ -19,9 +15,6 @@
 #ifndef OF_WRITE
 #define  OF_WRITE WRITE
 #endif
-
-#define INCH            25397L         // 25.397 mm per inch (x1000)
-#define PPI             72             // 72 points per inch
 
 #include "geo.h"
 

@@ -1,4 +1,3 @@
-#include "stdafx.h"
 #include "geo.h"
 #include "e-file.h"
 
@@ -185,7 +184,7 @@ int AddRepFile( wchar_t *fname, DWORD encoding )
 	char		temp_buf[ FILE_BUFFER_SIZE ];
 	wchar_t		line_buf[ LINE_BUFFER_SIZE ];
 	wchar_t		*p;
-	size_t		sz, cnt, len;
+	size_t		sz, cnt;
 	repfile_P	pri;
 	reppoint_P	prp;
 	wchar_t		*ps;

@@ -120,6 +120,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>WIN32;NDEBUG;_WINDOWS;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <ConformanceMode>true</ConformanceMode>
+      <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>
@@ -148,6 +149,7 @@
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClInclude Include="bmpgen.h" />
+    <ClInclude Include="dib.h" />
     <ClInclude Include="e-file.h" />
     <ClInclude Include="geo.h" />
     <ClInclude Include="Resource.h" />
@@ -156,6 +158,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="bmpgen.c" />
+    <ClCompile Include="dib.c" />
     <ClCompile Include="e-file.c" />
     <ClCompile Include="geo.c" />
     <ClCompile Include="mapread.c" />

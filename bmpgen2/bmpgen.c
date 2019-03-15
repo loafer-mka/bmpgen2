@@ -1,8 +1,8 @@
-﻿// bmpgen2.cpp : Определяет точку входа для приложения.
+﻿// bmpgen2.cpp
 //
 
-#include "stdafx.h"
 #include "bmpgen.h"
+#include "dib.h"
 
 #define MAX_LOADSTRING 100
 
@@ -30,6 +30,7 @@ static wchar_t    szHeight[] = L"Image Height";
 static wchar_t    szWidth[] = L"Image Width";
 static wchar_t    szFloat[] = L"Floating Point";
 static wchar_t    szUpdatePicture[] = L"Update picture";
+static wchar_t    szBppImage[] = L"Bitmap BPP";
 
 static wchar_t    szBmpClass[] = TEXT( BMPCLASS );
 static wchar_t    szDlgClass[] = TEXT( DLGCLASS );
@@ -45,241 +46,18 @@ static UINT       lfMarkSize;             // font size, in points
 static LOGFONT    lfRep;                  // font description
 static UINT       lfRepSize;              // font size, in points
 static BOOL       fUpdatePicture = TRUE;  // update dialog's picture with drawing map
+static UINT       nBppImage;              // count of colors in bitmap
 
 static wchar_t    bmpgen[] = L"Bitmap Generator";
-
-// ------------------ work with DIB resources ------------------
-typedef struct OWNRES {
-	HANDLE   hInstance;
-	LPSTR    ptr;
-	HGLOBAL  hglb;
-} *LPOWNRES;
-
-typedef  BITMAPINFOHEADER     DIB;
-typedef  DIB                 *LPDIB;
-
-static LPSTR LoadOwnResource( LPOWNRES lpo, LPWSTR name, LPWSTR type )
-{
-	HRSRC    hr;
-	HGLOBAL  hglb = (HGLOBAL)NULL;
-	LPSTR    r = (LPSTR)NULL;
-
-	hr = FindResource( (HMODULE)( lpo->hInstance ), name, type );
-	if ( hr ) {
-		hglb = (HGLOBAL)LoadResource( (HMODULE)( lpo->hInstance ), hr );
-		if ( hglb ) {
-			r = (LPSTR)LockResource( hglb );
-			if ( !r ) hglb = (HGLOBAL)0L;
-		}
-	}
-	lpo->hglb = hglb;
-	lpo->ptr = r;
-	return r;
-}
-
-
-static void FreeOwnResource( LPOWNRES lpo )
-{
-	lpo->hglb = (HGLOBAL)0L;
-	lpo->ptr = (LPSTR)NULL;
-}
-
-
-static UINT GetDIBPaletteSize( LPDIB lph )
-{
-	UINT           palsize = 0;
-
-	if ( lph ) {
-		palsize = (WORD)( lph->biClrUsed ) * sizeof( RGBQUAD );
-		if ( !palsize ) {
-			palsize = lph->biPlanes * lph->biBitCount;
-			switch ( (UINT)palsize ) {
-			case 1:  case 4:  case 8:  palsize = ( 1 << palsize ) * sizeof( RGBQUAD );  break;
-			case 16: case 32:          palsize = 12;  break;
-			default:                   palsize = 0;   break;
-			}
-		}
-	}
-	return palsize;
-}
-
-
-static HPALETTE  CreateDIBPalette( LPDIB lph )
-{
-	HPALETTE		r = (HPALETTE)0L;
-	UINT			palsize;
-	LPLOGPALETTE		lpp;
-	LPRGBQUAD		from;
-	LPPALETTEENTRY	to;
-	UINT			i;
-
-	if ( lph ) {
-		palsize = GetDIBPaletteSize( lph );
-		if ( palsize && palsize != 12 ) {
-			lpp = (LPLOGPALETTE)malloc( palsize + sizeof( LOGPALETTE ) );
-			if ( lpp ) {
-				lpp->palVersion = 0x300;
-				lpp->palNumEntries = (WORD)( palsize / sizeof( RGBQUAD ) );
-				// warning! color components of PALETTEENTRY and RGBQUAD are
-				// placed into different order! we must reorder they when copying.
-				to = lpp->palPalEntry;
-				from = (LPRGBQUAD)( (LPSTR)(lph)+(WORD)( lph->biSize ) );
-				for ( i = 0; i < palsize / sizeof( RGBQUAD ); i++, to++, from++ ) {
-					to->peRed = from->rgbRed;
-					to->peGreen = from->rgbGreen;
-					to->peBlue = from->rgbBlue;
-					to->peFlags = 0;
-				}
-				r = CreatePalette( lpp );
-				free( lpp );
-			}
-		}
-	}
-	return r;
-}
-
-
-static HBITMAP CreateDDBfromDIB( HDC hdc, LPDIB lph )
-{
-	return CreateDIBitmap(
-		hdc,
-		(LPBITMAPINFOHEADER)lph,
-		CBM_INIT,
-		(LPVOID)( ( (LPSTR)lph ) + (WORD)( lph->biSize ) + GetDIBPaletteSize( lph ) ),
-		(LPBITMAPINFO)lph,
-		DIB_RGB_COLORS
-	);
-}
-
-
-static DWORD   GetDIBImageSize( WORD bpp, LONG width, LONG height )
-{
-	DWORD    imagesize;
-
-	imagesize = (DWORD)( width >= 0L ? width : -width );
-	imagesize *= bpp;
-	imagesize = ( ( imagesize + 31 ) & ~31 ) >> 3;
-	imagesize *= height > 0L ? height : -height;
-	return imagesize;
-}
-
-
-/* default DPIX, DPIY := 96 */
-static LPDIB   CreateDIB( WORD bpp, LONG  width, LONG height, UINT DPIX, UINT DPIY )
-{
-	LPDIB    lpb;
-	UINT     palsize;
-	LONG     imagesize;
-
-	// check input data
-	if (
-		!( width && height && ( bpp == 1 || bpp == 4 || bpp == 8 || bpp == 16 || bpp == 24 || bpp == 32 ) )
-		) return (LPDIB)NULL;
-
-	switch ( bpp ) {
-	case 1:  case 4: case 8:   palsize = ( 1 << bpp ) * sizeof( RGBQUAD );  break;
-	case 16: case 32:          palsize = 12;  break;
-	default:                   palsize = 0;   break;
-	}
-
-	imagesize = GetDIBImageSize( bpp, width, height );
-
-	lpb = (LPDIB)malloc( sizeof( BITMAPINFOHEADER ) + palsize + imagesize );
-	if ( lpb ) {
-		lpb->biSize = sizeof( BITMAPINFOHEADER );
-		lpb->biWidth = width;
-		lpb->biHeight = height;
-		lpb->biPlanes = 1;
-		lpb->biBitCount = bpp;
-		lpb->biCompression = bpp == 16 || bpp == 32 ? 3 : BI_RGB;   // 3 = BI_BITFIELDS
-		lpb->biSizeImage = imagesize;
-		lpb->biXPelsPerMeter = (LONG)( ( DPIX * 1000000UL ) / INCH );
-		lpb->biYPelsPerMeter = (LONG)( ( DPIY * 1000000UL ) / INCH );
-		lpb->biClrUsed = 0;
-		lpb->biClrImportant = 0;
-	}
-	return lpb;
-}
-
-
-static BOOL SaveDIB( LPWSTR file, LPDIB lpb )
-{
-	BOOL              a = FALSE;
-	BITMAPFILEHEADER  bmf;
-	DWORD             imagesize;
-	UINT              palsize;
-	FILE              *fp = NULL;
-
-	if ( file && lpb ) {
-		fp = _wfopen( file, L"w+b" );
-		if ( fp ) {
-			imagesize = lpb->biSizeImage;
-			if ( !imagesize ) imagesize = GetDIBImageSize(
-				(WORD)( lpb->biPlanes * lpb->biBitCount ), lpb->biWidth, lpb->biHeight
-			);
-			palsize = GetDIBPaletteSize( lpb );
-			bmf.bfType = 0x4D42;
-			bmf.bfOffBits = sizeof( BITMAPFILEHEADER ) + lpb->biSize + palsize;
-			bmf.bfSize = bmf.bfOffBits + imagesize;
-			bmf.bfReserved1 = 0L;
-			bmf.bfReserved2 = 0L;
-
-			if ( fwrite( (LPSTR)&bmf, 1, sizeof( bmf ), fp ) == sizeof( bmf ) ) {
-				bmf.bfSize -= sizeof( BITMAPFILEHEADER );
-				if ( fwrite( (LPSTR)lpb, 1, bmf.bfSize, fp ) == bmf.bfSize ) a = TRUE; else {
-					fclose( fp );
-					fp = NULL;
-					_wremove( file );
-				}
-			}
-		}
-	}
-	if ( fp ) fclose( fp );
-	return a;
-}
-
-
-/* default DPIX, DPIY := 96 */
-static LPDIB CreateDIBfromDDB( HDC hdc, HBITMAP hbmp, UINT DPIX, UINT DPIY )
-{
-	BITMAP      bmp;
-	LPDIB       lpb = (LPDIB)0L;
-	HBITMAP     hbmpT;
-
-	if ( hbmp ) {
-		GetObject( hbmp, sizeof( BITMAP ), &bmp );
-		lpb = CreateDIB( 1, bmp.bmWidth, bmp.bmHeight, DPIX, DPIY );
-		if ( !hdc ) {
-			hdc = CreateCompatibleDC( NULL );
-			hbmpT = (HBITMAP)SelectObject( hdc, hbmp );
-		} else hbmpT = (HBITMAP)0L;
-		if ( lpb ) {
-			GetDIBits(
-				hdc,
-				hbmp,
-				0, bmp.bmHeight,
-				(LPVOID)( ( (LPSTR)( lpb ) ) + lpb->biSize + GetDIBPaletteSize( lpb ) ),
-				(LPBITMAPINFO)lpb,
-				DIB_RGB_COLORS
-			);
-		}
-		if ( hbmpT ) {
-			SelectObject( hdc, hbmpT );
-			DeleteDC( hdc );
-		}
-	}
-	return lpb;
-}
-
-
 
 // ----------------------- fill wanted map ------------------------------
 static BOOL OnBmpQueryNewPalette( HWND hwnd );
 
-static HBITMAP FillMap( LPWSTR infile, UINT encoding, UINT width, UINT height, int marksize, int repsize )
+static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, UINT height, int marksize, int repsize )
 {
 	HDC      hcdc = (HDC)0L;
-	HBITMAP  hbmp = (HBITMAP)0L, hbmpold;
+	LPDIB    pdib = (LPDIB)0L;
+	HBITMAP  hbmpold = (HBITMAP)0L;
 
 	hcdc = CreateCompatibleDC( NULL );
 	if ( !hcdc ) {
@@ -287,13 +65,17 @@ static HBITMAP FillMap( LPWSTR infile, UINT encoding, UINT width, UINT height, i
 		goto RETURN;
 	}
 
-	hbmp = CreateBitmap( width, height, 1, 1, NULL );
-	if ( !hbmp ) {
+	HDC hwindc = GetWindowDC( NULL );
+	pdib = CreateDIBWithDDB( hwindc, phbmp, nBppImage, width, height, 96, 96 );
+	ReleaseDC( NULL, hwindc );
+
+	if ( !*phbmp || !pdib ) {
 		MessageBox( NULL, L"Cannot create DDB for map", bmpgen, MB_OK | MB_ICONEXCLAMATION );
 		goto RETURN;
 	}
 
-	hbmpold = (HBITMAP)SelectObject( hcdc, hbmp );
+	hbmpold = SelectBitmap( hcdc, *phbmp );
+
 	PatBlt( hcdc, 0, 0, width, height, PATCOPY );                 // fill white
 
 	if ( !MapDraw(
@@ -307,63 +89,35 @@ static HBITMAP FillMap( LPWSTR infile, UINT encoding, UINT width, UINT height, i
 		goto RETURN;
 	}
 
-	SelectObject( hcdc, hbmpold );
+	if ( hbmpold ) SelectBitmap( hcdc, hbmpold );
 
 RETURN:
 	if ( hcdc ) DeleteDC( hcdc );
 	inwork = FALSE;
-	return hbmp;
+	return pdib;
 }
 
 
-static void CreatePreviewBitmap( HWND hwnd, HBITMAP hbmp )
+static void CreatePreviewBitmap( HWND hwnd, LPDIB pdib )
 {
 	HWND     hwndPreview = (HWND)NULL;
-	HBITMAP  hbmpPreview, hbmpT, hbmpTS;
-	BITMAP   bmp;
-	HDC      hcdc, hcdcsrc;
+	HBITMAP  hbmpPreview, holdbmp;
+	HDC      hwindc;
 	HPALETTE hpal;
-	RECT     rc;
-	LONG     w;
 	BOOL     a = FALSE;
 
-	if ( hbmp && hwnd && fUpdatePicture ) {
+	if ( pdib && hwnd && fUpdatePicture ) {
 		hwndPreview = GetDlgItem( hwnd, IDC_BITMAP );
 		if ( !hwndPreview ) return;
 
-		GetObject( hbmp, sizeof( bmp ), &bmp );
+		hwindc = GetDC( hwnd );
+		hbmpPreview = CreateDDBfromDIB( hwindc, pdib );
+		ReleaseDC( hwnd, hwindc );
 
-		GetClientRect( hwndPreview, &rc );
-		w = (UINT)( rc.bottom * (LONG)( bmp.bmWidth ) / bmp.bmHeight );
-		if ( w > rc.right ) {
-			rc.bottom = (UINT)( rc.right * (LONG)( bmp.bmHeight ) / bmp.bmWidth );
-		} else {
-			rc.right = w;
-		}
-		hbmpPreview = CreateBitmap( rc.right, rc.bottom, 1, 1, NULL );
-		if ( hbmpPreview ) {
-			hcdc = CreateCompatibleDC( NULL );
-			hbmpT = (HBITMAP)SelectObject( hcdc, hbmpPreview );
-			PatBlt( hcdc, 0, 0, rc.right, rc.bottom, PATCOPY );
-
-			hcdcsrc = CreateCompatibleDC( NULL );
-			hbmpTS = (HBITMAP)SelectObject( hcdcsrc, hbmp );
-
-			StretchBlt( hcdc, 0, 0, rc.right, rc.bottom, hcdcsrc, 0, 0, bmp.bmWidth, bmp.bmHeight, SRCCOPY );
-
-			SelectObject( hcdcsrc, hbmpTS );
-			DeleteDC( hcdcsrc );
-			SelectObject( hcdc, hbmpT );
-			DeleteDC( hcdc );
-
-			hbmpT = (HBITMAP)SetWindowLong( hwndPreview, 0, (LONG)hbmpPreview );
-			if ( hbmpT ) DeleteObject( hbmpT );
-			hpal = (HPALETTE)SetWindowLong( hwndPreview, 4, 0L );
-			if ( hpal ) DeleteObject( hpal );
-
-			SetWindowText( hwndPreview, L"" );
-			a = TRUE;
-		}
+		holdbmp = (HBITMAP)SetWindowLong( hwndPreview, 0, (LONG)hbmpPreview );
+		if ( holdbmp ) DeleteObject( holdbmp );
+		hpal = (HPALETTE)SetWindowLong( hwndPreview, 4, (LONG)CreateDIBPalette( pdib ) );
+		if ( hpal ) DeleteObject( hpal );
 	}
 	if ( !a ) SetWindowText( hwndPreview, L"flow1" );
 	if ( !OnBmpQueryNewPalette( hwndPreview ) ) InvalidateRect( hwndPreview, NULL, TRUE );
@@ -413,8 +167,8 @@ static void OnBmpDestroy( HWND hwnd )
 {
 	HBITMAP     hbmp = (HBITMAP)SetWindowLong( hwnd, 0, 0L );
 	HPALETTE    hpal = (HPALETTE)SetWindowLong( hwnd, 4, 0L );
-	if ( hbmp ) DeleteObject( hbmp );
-	if ( hpal ) DeleteObject( hpal );
+	if ( hbmp ) DeleteBitmap( hbmp );
+	if ( hpal ) DeleteBitmap( hpal );
 }
 
 
@@ -432,17 +186,32 @@ static BOOL OnBmpEraseBkgnd( HWND hwnd, HDC hdc )
 	HBITMAP        hbmp, hbmpold;
 	HPALETTE       hpal;
 	BITMAP         bmp;
-	RECT           rc;
+	RECT           rc, rcb;
 	HDC            hcdc;
 	int            n;
+	LONG           w;
 
 	hbmp = (HBITMAP)GetWindowLong( hwnd, 0L );
 	hpal = (HPALETTE)GetWindowLong( hwnd, 4L );
 	if ( hbmp ) {
 		GetObject( hbmp, sizeof( bmp ), &bmp );
 		GetClientRect( hwnd, &rc );
-		rc.left = ( rc.right - bmp.bmWidth ) / 2;
-		rc.top = ( rc.bottom - bmp.bmHeight ) / 2;
+
+		if ( bmp.bmWidth > rc.right || bmp.bmHeight > rc.bottom ) {
+			rcb = rc;
+			w = rcb.bottom * (LONG)( bmp.bmWidth ) / bmp.bmHeight;
+			if ( w > rcb.right ) {
+				rcb.bottom = rcb.right * (LONG)( bmp.bmHeight ) / bmp.bmWidth;
+			} else {
+				rcb.right = w;
+			}
+		} else {
+			rcb.left = 0; rcb.top = 0;
+			rcb.right = bmp.bmWidth; rcb.bottom = bmp.bmHeight;
+		}
+
+		rc.left = ( rc.right - rcb.right ) / 2;
+		rc.top = ( rc.bottom - rcb.bottom ) / 2;
 		if ( rc.top > 0 ) {
 			PatBlt( hdc, 0, 0, rc.right, rc.top, PATCOPY );
 			PatBlt( hdc, 0, rc.bottom - rc.top - 1, rc.right, rc.top, PATCOPY );
@@ -454,7 +223,7 @@ static BOOL OnBmpEraseBkgnd( HWND hwnd, HDC hdc )
 		}
 		hcdc = CreateCompatibleDC( hdc );
 		hbmpold = SelectBitmap( hcdc, hbmp );
-		BitBlt( hdc, rc.left, rc.top, bmp.bmWidth, bmp.bmHeight, hcdc, 0, 0, SRCCOPY );
+		StretchBlt( hdc, rc.left, rc.top, rcb.right, rcb.bottom, hcdc, 0, 0, bmp.bmWidth, bmp.bmHeight, SRCCOPY );
 		SelectBitmap( hcdc, hbmpold );
 		DeleteDC( hcdc );
 		return TRUE;
@@ -519,14 +288,14 @@ STD:
 }
 
 
-LONG WINAPI WndProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
+LONG WINAPI WndBitmapProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
 {
 	switch ( wmsg ) {
-		HANDLE_MSG( hwnd, WM_CREATE, OnBmpCreate );
-		HANDLE_MSG( hwnd, WM_PAINT, OnBmpPaint );
-		HANDLE_MSG( hwnd, WM_ERASEBKGND, OnBmpEraseBkgnd );
-		HANDLE_MSG( hwnd, WM_DESTROY, OnBmpDestroy );
-		HANDLE_MSG( hwnd, WM_QUERYNEWPALETTE, OnBmpQueryNewPalette );
+	HANDLE_MSG( hwnd, WM_CREATE, OnBmpCreate );
+	HANDLE_MSG( hwnd, WM_PAINT, OnBmpPaint );
+	HANDLE_MSG( hwnd, WM_ERASEBKGND, OnBmpEraseBkgnd );
+	HANDLE_MSG( hwnd, WM_DESTROY, OnBmpDestroy );
+	HANDLE_MSG( hwnd, WM_QUERYNEWPALETTE, OnBmpQueryNewPalette );
 	}
 	return DefWindowProc( hwnd, wmsg, wParam, lParam );
 }
@@ -600,8 +369,7 @@ update:
 
 
 // --------------- dialog message handlers -------------------
-static BOOL mustbeinited = TRUE;
-static BOOL OnDlgInitDialog( HWND, HWND, LPARAM );
+static void OnDlgCommandBppImage( HWND hwnd, HWND hwndCtl, UINT codeNotify );
 
 static void CheckDlgItems( HWND hwnd )
 {
@@ -693,7 +461,7 @@ static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 {
 	wchar_t     infile[ 1024 ];
 	wchar_t     outfile[ 1024 ];
-	LPDIB       lpb;
+	LPDIB       pdib;
 	LONG        cx, cy;
 	HBITMAP     hbmp;
 	UINT        encoding;
@@ -746,18 +514,16 @@ static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 		break;
 	}
 
-	hbmp = FillMap(
-		infile, encoding, (UINT)cx, (UINT)cy,
+	pdib = FillMap(
+		infile, encoding, &hbmp, (UINT)cx, (UINT)cy,
 		(int)GetDlgItemInt( hwnd, IDC_MARKSIZE, NULL, FALSE ),
 		(int)GetDlgItemInt( hwnd, IDC_REPSIZE, NULL, FALSE )
 	);
 	if ( hbmp ) {
-		lpb = CreateDIBfromDDB( NULL, hbmp, dpix, dpiy );
-		CreatePreviewBitmap( hwnd, hbmp );
-		DeleteObject( hbmp );
-		if ( lpb ) {
-			SaveDIB( outfile, lpb );
-			free( lpb );
+		CreatePreviewBitmap( hwnd, pdib );
+		if ( pdib ) {
+			SaveDIB( outfile, pdib );
+			FreeDIBWithDDB( pdib, hbmp );
 		}
 	}
 	if ( timerid ) _wremove( infile );
@@ -1019,7 +785,38 @@ static void OnDlgCommandClose( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 	swprintf( txt, sizeof( txt ) / sizeof( txt[ 0 ] ), szUFmt, Button_GetCheck( GetDlgItem( hwnd, IDC_UPDPICTURE ) ) );
 	WritePrivateProfileString( szOpt, szUpdatePicture, txt, szIni );
 
+	OnDlgCommandBppImage( NULL, GetDlgItem( hwnd, IDC_BPP ), 0 );
+
 	EndDialog( hwnd, 0 );
+}
+
+
+static void OnDlgCommandBppImage( HWND hwnd, HWND hwndCtl, UINT codeNotify )
+{
+	wchar_t		txt[ 64 ];
+	int		n;
+	static int	n0 = -2;
+	static UINT	bpps[] = { 1, 8, 16, 24, 32 };
+	UNUSED_ARG( hwnd );
+	UNUSED_ARG( codeNotify );
+
+	n = ComboBox_GetCurSel( hwndCtl );
+	if ( n0 != n ) {
+		switch ( n ) {
+		default:    // 1bpp (BW)
+			n = 0;
+			// fall through
+		case 1:     // 8bpp
+		case 2:     // 16bpp
+		case 3:     // 24bpp
+		case 4:     // 32bpp
+			nBppImage = bpps[ n ];
+			break;
+		}
+		swprintf( txt, sizeof( txt ) / sizeof( txt[ 0 ] ), L"%u", nBppImage );
+		WritePrivateProfileString( szOpt, szBppImage, txt, szIni );
+		n0 = n;
+	}
 }
 
 
@@ -1046,6 +843,7 @@ static void OnDlgCommand( HWND hwnd, int id, HWND hwndCtl, UINT codeNotify )
 	case IDC_MARKFONT:   OnDlgCommandMarkFont( hwnd, hwndCtl, codeNotify ); break;
 	case IDC_REPFONT:    OnDlgCommandRepFont( hwnd, hwndCtl, codeNotify ); break;
 	case IDC_UPDPICTURE: OnDlgCommandUpdatePicture( hwnd, hwndCtl, codeNotify ); break;
+	case IDC_BPP:        OnDlgCommandBppImage( hwnd, hwndCtl, codeNotify ); break;
 	default:          break;
 	}
 }
@@ -1113,6 +911,24 @@ static BOOL OnDlgInitDialog( HWND hwnd, HWND hwndFocus, LPARAM lParam )
 		(int)( fUpdatePicture = GetPrivateProfileInt( szOpt, szUpdatePicture, 1, szIni ) ? TRUE : FALSE )
 	);
 
+	hw = GetDlgItem( hwnd, IDC_BPP );
+	ComboBox_AddString( hw, L"B/W image (monochrome)" );
+	ComboBox_AddString( hw, L"256-color image (8bpp)" );
+	ComboBox_AddString( hw, L"16K-HiColor (16bpp)" );
+	ComboBox_AddString( hw, L"TrueColor (24bpp)" );
+	ComboBox_AddString( hw, L"16M-HiColor (32bpp)" );
+	y = 0;
+	switch ( GetPrivateProfileInt( szOpt, szBppImage, 1, szIni ) ) {
+	default:
+	case 1:	y = 0; break;
+	case 8:	y = 1; break;
+	case 16: y = 2; break;
+	case 24: y = 3; break;
+	case 32: y = 4; break;
+	}
+	ComboBox_SetCurSel( hw, y );
+	OnDlgCommandBppImage( hwnd, hw, 0 );
+
 	// disable start and autostart options until maps loaded
 	CheckDlgItems( hwnd );
 	return FALSE;
@@ -1161,8 +977,6 @@ static void OnDlgDestroy( HWND hwnd )
 	FreeAllArcFiles();
 	ChooseDPI( hwnd, DPI_RELEASE );
 	if ( timerid ) { KillTimer( hwnd, timerid ); timerid = 0; }
-
-	mustbeinited = TRUE;
 }
 
 
@@ -1177,20 +991,6 @@ static void OnDlgPaletteChanged( HWND hwnd, HWND hwndPaletteChange )
 static BOOL OnDlgQueryNewPalette( HWND hwnd )
 {
 	return FORWARD_WM_QUERYNEWPALETTE( GetDlgItem( hwnd, IDC_BITMAP ), SendMessage );
-}
-
-
-static void OnDlgActivate( HWND hwnd, UINT state, HWND hwndActDeact, BOOL fMinimized )
-{
-	UNUSED_ARG( hwnd );
-	UNUSED_ARG( hwndActDeact );
-	UNUSED_ARG( fMinimized );
-
-	active = state ? TRUE : FALSE;
-	if ( mustbeinited && state ) {
-		mustbeinited = FALSE;
-		OnDlgInitDialog( hwnd, (HWND)NULL, 0L );
-	}
 }
 
 
@@ -1213,7 +1013,7 @@ static void OnDlgTimer( HWND hwnd, UINT id )
 }
 
 
-LONG WINAPI DlgProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
+LONG WINAPI DlgWindowProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
 {
 	switch ( wmsg ) {
 	HANDLE_MSG( hwnd, WM_CREATE, OnDlgCreate );
@@ -1225,14 +1025,23 @@ LONG WINAPI DlgProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
 	HANDLE_MSG( hwnd, WM_CTLCOLORSTATIC, OnDlgCtlColor );
 	HANDLE_MSG( hwnd, WM_PALETTECHANGED, OnDlgPaletteChanged );
 	HANDLE_MSG( hwnd, WM_QUERYNEWPALETTE, OnDlgQueryNewPalette );
-	HANDLE_MSG( hwnd, WM_ACTIVATE, OnDlgActivate );
 	HANDLE_MSG( hwnd, WM_TIMER, OnDlgTimer );
 	}
 	return DefDlgProc( hwnd, wmsg, wParam, lParam );
 }
 
 
-int APIENTRY wWinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hPrev, _In_ LPWSTR lpszCmd, _In_ int nCmdShow )
+INT_PTR CALLBACK DlgDialogProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
+{
+	switch ( wmsg ) {
+	case WM_INITDIALOG: OnDlgInitDialog( hwnd, (HWND)wParam, lParam ); return TRUE;
+	default: break;
+	}
+	return FALSE;
+}
+
+
+int APIENTRY wWinMain( _In_ HINSTANCE hInst, _In_opt_ HINSTANCE hPrev, _In_ LPWSTR lpszCmd, _In_ int nCmdShow )
 {
 	WNDCLASS       wc;
 	UNUSED_ARG( lpszCmd );
@@ -1244,7 +1053,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hPrev, _In_ LPWST
 	if ( !hPrev ) {
 		// Initialize application
 		wc.style = 0;
-		wc.lpfnWndProc = WndProc;
+		wc.lpfnWndProc = WndBitmapProc;
 		wc.cbClsExtra = 0;
 		wc.cbWndExtra = 2 * sizeof( LONG );
 		wc.hInstance = hInst;
@@ -1255,7 +1064,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hPrev, _In_ LPWST
 		wc.lpszClassName = szBmpClass;
 		RegisterClass( &wc );
 
-		wc.lpfnWndProc = DlgProc;
+		wc.lpfnWndProc = DlgWindowProc;
 		wc.cbWndExtra = DLGWINDOWEXTRA;
 		wc.hIcon = LoadIcon( hInst, L"Aearth" );
 		wc.hbrBackground = (HBRUSH)GetStockObject( LTGRAY_BRUSH );
@@ -1267,7 +1076,7 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInst, _In_opt_ HINSTANCE hPrev, _In_ LPWST
 		wc.lpszClassName = szResClass;
 		RegisterClass( &wc );
 
-		DialogBox( hInst, L"MAP", NULL, (DLGPROC)NULL );
+		DialogBox( hInst, L"MAP", NULL, (DLGPROC)DlgDialogProc );
 	}
 	return 0;
 }

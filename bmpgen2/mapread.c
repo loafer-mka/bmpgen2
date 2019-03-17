@@ -258,6 +258,7 @@ int MapDraw(
 		G2G( 0,0,1 ),
 		0.0
 	};
+#define LEGACY_STEP_SCALE	1000.0
 
 	if ( !e_fopen( &infile, fname, encoding ) ) return 0;
 	e_fsetvbuf( &infile, temp_buf, _IOFBF, sizeof( temp_buf ) );
@@ -393,7 +394,7 @@ int MapDraw(
 	p0.x = pt.x / fdm_width;	// average step of grid in 0.001 of degree
 	p0.y = pt.x / fdm_height;
 
-	pw.x = pw.y = step[ n ];
+	pw.x = pw.y = step[ 0 ];
 	for ( n = 0; step[ n ]; n++ ) { pw.x = step[ n ];  if ( p0.x > step[ n + 1 ] ) break; }
 	for ( n = 0; step[ n ]; n++ ) { pw.y = step[ n ];  if ( p0.y > step[ n + 1 ] ) break; }
 	// now 'pw.x' and 'pw.y' are steps of grid in 0.001 of degree
@@ -438,7 +439,7 @@ int MapDraw(
 	SelectObject( hdc, hpen[ 2 ] );
 	SelectObject( hdc, GetStockObject( HOLLOW_BRUSH ) );
 	for ( lpri = GetRootRep(); lpri; lpri = lpri->next ) {     // loop for .rep files
-		if ( lpri->dp < pw.y ) continue;
+		if ( lpri->dp < (long)(pw.y*LEGACY_STEP_SCALE) ) continue;
 		lprp = (reppoint_P)( lpri + 1 );
 		for ( T = (geo_t)lpri->points; T > 0L; --T, lprp++ ) {  // loop for rep. points
 			if (
@@ -446,15 +447,15 @@ int MapDraw(
 				lprp->pt.x < fmap.east &&
 				lprp->pt.y > fmap.south &&
 				lprp->pt.y < fmap.north &&
-				lprp->dp >= pw.y
-				) {
+				lprp->dp >= (long)(pw.y*LEGACY_STEP_SCALE)
+			) {
 				g2d( &( lprp->pt ), &p );
 				if ( lprp->rsize ) {
 					Dtx = Drx * lprp->rsize / 100;    if ( !Dtx ) Dtx = 1;
 					Dty = Dry * lprp->rsize / 100;    if ( !Dty ) Dty = 1;
 					Ellipse( hdc, (int)p.x - Dtx, (int)p.y - Dty, (int)p.x + Dtx, (int)p.y + Dty );    // draw reper point
 				}
-				if ( ( lprp->dn >= (long)pw.y ) && lprp->name ) {   // draw name
+				if ( ( lprp->dn >= (long)(pw.y*LEGACY_STEP_SCALE) ) && lprp->name ) {   // draw name
 					pt.x = pt.y = 0;	n = (int)wcslen( lprp->name );
 					GetTextExtentPoint( hdc, lprp->name, n, (LPSIZE)&pt );
 					i = (int)( p.y - Dry - D - pt.y + tm.tmDescent );

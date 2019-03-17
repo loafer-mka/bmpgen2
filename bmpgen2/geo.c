@@ -49,14 +49,14 @@ geo_t	atogeo( wchar_t *str )
 	//    source may be xxx.yyyyyy - decimal form, or xxx.yy - degrees and minutes, or xxx.yyyy - degress and seconds
 	wchar_t	*p;
 	int	neg;
-	geo_t	degree, fraction;
+	geo_t	degree, value, fraction;
 	int	n;
 	int	c;
 
 	p = bow( str );					/* skip spaces */
 	neg = 0; if ( *p == L'-' ) { p++; neg = 1; }	/* check sign */
 
-	degree = fraction = geo_0;
+	degree = value = fraction = geo_0;
 	for ( c = (int)*p++; c >= L'0' && c <= L'9'; c = (int)*p++ ) {
 		degree = degree * geo_10 + (geo_t)( c - (int)L'0' );
 	}
@@ -74,8 +74,36 @@ geo_t	atogeo( wchar_t *str )
 		} else {
 			fraction /= (geo_t)pow( 10.0, (double)n );
 		}
+		degree += fraction;
+	} else if ( c == (int)L'\u00B0' || c == (int)L'\u00BA' ) {	// xB0 (degree),  xBA (masculine ordinal indicator)
+		n = 0;
+		do {
+			for ( c = (int)*p++; c >= L'0' && c <= L'9'; c = (int)*p++ ) {
+				fraction = fraction * geo_10 + (geo_t)( c - (int)L'0' );
+			}
+			if ( c == (int)L'.' || c == ( int )',' ) {
+				value = geo_0_1;
+				for ( c = (int)*p++; c >= L'0' && c <= L'9'; c = (int)*p++, value *= geo_0_1 ) {
+					fraction += ( (geo_t)( c - (int)L'0' ) ) * value;
+				}
+			}
+			if ( c == (int)L'\'' || c == (int)L'`' || c == (int)L'\u2018' || c == (int)L'\u2019' ) {
+				// minutes
+				if ( 0 != n ) break;	// minutes can be first after degrees only
+				fraction /= geo_60;
+			} else if ( c == (int)L'"' || c == (int)L'\u201C' || c == (int)L'\u201D' ) {
+				// seconds
+				if ( n > 1 ) break;	// seconds can be first after degrees (single) or second (after minutes)
+				fraction /= geo_3600;
+			} else {
+				break;	// wrong!
+			}
+			n++;
+			degree += fraction;
+			fraction = geo_0;
+		} while ( TRUE );
 	}
-	degree = (geo_t)fmod( (double)( degree + fraction ), (double)geo_360 );	/* return +- 360 degrees */
+	degree = (geo_t)fmod( (double)( degree ), (double)geo_360 );	/* return +- 360 degrees */
 	return neg ? -degree : degree;
 }
 
@@ -120,24 +148,24 @@ wchar_t	*spatialtoa( geo_t x )
 	if ( sign == L'-' ) *p++ = L'-';
 	if ( seconds < 0.001 ) {
 		if ( minutes < 0.1 ) {
-			swprintf( p, 32, L"%i%lc", (int)degrees, 176 );
+			swprintf( p, 32, L"%i\u00B0", (int)degrees );
 		} else {
-			swprintf( p, 32, L"%i%lc%i%lc", (int)degrees, 176, (int)minutes, 145 );
+			swprintf( p, 32, L"%i\u00B0%i'", (int)degrees, (int)minutes );
 		}
 	} else {
 		frac = seconds - floor( seconds + 0.5 );
 		if ( frac < 0.0 ) frac = -frac;
 		if ( frac < 0.001 ) {
 			if ( minutes < 0.1 ) {
-				swprintf( p, 32, L"%i%lc%i%lc", (int)degrees, 176, (int)seconds, 147 );
+				swprintf( p, 32, L"%i\u00B0%i\"", (int)degrees, (int)seconds );
 			} else {
-				swprintf( p, 32, L"%i%lc%i%lc%i%lc", (int)degrees, 176, (int)minutes, 145, (int)seconds, 147 );
+				swprintf( p, 32, L"%i\u00B0%i'%i\"", (int)degrees, (int)minutes, (int)seconds );
 			}
 		} else {
 			if ( minutes < 0.1 ) {
-				swprintf( p, 32, L"%i%lc%.3f%lc", (int)degrees, 176, (double)seconds, 147 );
+				swprintf( p, 32, L"%i\u00B0%.3f\"", (int)degrees, (double)seconds );
 			} else {
-				swprintf( p, 32, L"%i%lc%i%lc%.3f%lc", (int)degrees, 176, (int)minutes, 145, seconds, 147 );
+				swprintf( p, 32, L"%i\u00B0%i'%.3f\"", (int)degrees, (int)minutes, seconds );
 			}
 		}
 	}

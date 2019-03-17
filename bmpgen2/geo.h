@@ -2,6 +2,7 @@
 
 typedef double	geo_t;
 #define		geo_0		((geo_t)0.0)
+#define		geo_0_1		((geo_t)0.1)
 #define		geo_1		((geo_t)1.0)
 #define		geo_10		((geo_t)10.0)
 #define		geo_60		((geo_t)60.0)

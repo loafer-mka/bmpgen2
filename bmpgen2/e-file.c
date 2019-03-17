@@ -35,11 +35,11 @@ wchar_t *e_fgets( wchar_t *buf, UINT size, struct EFILE *ep )
 	}
 	sz = size;
 	if ( sz >= sizeof( temp ) ) sz = sizeof( temp );
-	p = fgets( temp, sz, ep->fp );
+	p = fgets( temp, (int)sz, ep->fp );
 	if ( !p ) return NULL;
 	temp[ sz - 1 ] = '\0';
 	sz = strlen( temp ) + 1;
-	if ( !MultiByteToWideChar( ep->encoding, 0, temp, sz, buf, size ) ) {
+	if ( !MultiByteToWideChar( ep->encoding, 0, temp, (int)sz, buf, size ) ) {
 		volatile DWORD	dw = GetLastError();
 	}
 	return buf;
@@ -53,7 +53,7 @@ void e_fclose( struct EFILE *ep )
 
 int e_fsetvbuf( struct EFILE *ep, char* buffer, int mode, size_t size )
 {
-	return NULL == ep->fp ? -1 : ( ep->fp, buffer, mode, size );
+	return NULL == ep->fp ? -1 : setvbuf( ep->fp, buffer, mode, size );
 }
 
 int e_feof( struct EFILE *ep )

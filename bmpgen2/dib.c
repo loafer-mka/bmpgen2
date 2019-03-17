@@ -37,7 +37,11 @@ UINT GetDIBPaletteSize( LPDIB lph )
 		if ( !palsize ) {
 			palsize = lph->biPlanes * lph->biBitCount;
 			switch ( (UINT)palsize ) {
-			case 1:  case 4:  case 8:  palsize = ( 1 << palsize ) * sizeof( RGBQUAD );  break;
+#ifdef _WIN64
+			case 1:  case 4: case 8:   palsize = (UINT)( ( 1Ui64 << palsize ) * sizeof( RGBQUAD ) );  break;
+#else
+			case 1:  case 4:  case 8:  palsize = ( 1U << palsize ) * sizeof( RGBQUAD );  break;
+#endif
 			case 16: case 32:          palsize = 12;  break;
 			default:                   palsize = 0;   break;
 			}
@@ -122,7 +126,11 @@ LPDIB   CreateDIB( WORD bpp, LONG  width, LONG height, UINT DPIX, UINT DPIY )
 	) return (LPDIB)NULL;
 
 	switch ( bpp ) {
+#ifdef _WIN64
+	case 1:  case 4: case 8:   palsize = (UINT)( ( 1Ui64 << bpp ) * sizeof( RGBQUAD ) );  break;
+#else
 	case 1:  case 4: case 8:   palsize = ( 1 << bpp ) * sizeof( RGBQUAD );  break;
+#endif
 	case 16: case 32:          palsize = 12;  break;	// color masks (RGB, 3*4)
 	default:                   palsize = 0;   break;
 	}
@@ -164,7 +172,11 @@ LPDIB   CreateDIBWithDDB( HDC hdc, HBITMAP *phbmp, WORD bpp, LONG  width, LONG h
 	) return (LPDIB)NULL;
 
 	switch ( bpp ) {
-	case 1:  case 4: case 8:   palsize = ( 1 << bpp ) * sizeof( RGBQUAD );  break;
+#ifdef _WIN64
+	case 1:  case 4: case 8:   palsize = (UINT)( ( 1Ui64 << bpp ) * sizeof( RGBQUAD ) );  break;
+#else
+	case 1:  case 4: case 8:   palsize = ( 1U << bpp ) * sizeof( RGBQUAD );  break;
+#endif
 	case 16: case 32:          palsize = 12;  break;	// color masks (RGB, 3*4)
 	default:                   palsize = 0;   break;
 	}

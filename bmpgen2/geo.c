@@ -464,7 +464,7 @@ int AddArcFile( wchar_t *fname, UINT encoding, add_arc_callback_t cbproc, int cb
 			geotoa( S ), geotoa( N ), geotoa( W ), geotoa( E ), (LONG)points,
 			pmf->outline[ n ].title
 		);
-		cbproc( txt, cbrow + n + 1, ap );
+		cbproc( txt, cbrow + (int)n + 1, ap );
 
 		if ( !n ) {
 			pmf->area.west = W;
@@ -485,7 +485,11 @@ int AddArcFile( wchar_t *fname, UINT encoding, add_arc_callback_t cbproc, int cb
 	}
 	swprintf(
 		txt, sizeof( txt ) / sizeof( txt[ 0 ] ),
+#ifdef _WIN64
+		L"%ls:%ls с.ш. %ls:%ls в.д., %zu контуров (%ls)",
+#else
 		L"%ls:%ls с.ш. %ls:%ls в.д., %lu контуров (%ls)",
+#endif
 		geotoa( pmf->area.south ), geotoa( pmf->area.north ),
 		geotoa( pmf->area.west ), geotoa( pmf->area.east ),
 		outlines, pmf->title

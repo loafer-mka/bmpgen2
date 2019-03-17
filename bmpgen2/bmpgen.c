@@ -3,8 +3,23 @@
 
 #include "bmpgen.h"
 #include "dib.h"
+#include <math.h>
 
-#define MAX_LOADSTRING 100
+#define PREVIEW_FOLDER_WIDTH	2
+
+struct wbmp_wnd_extra {
+	LONG_PTR	wex_hbitmap;
+	LONG_PTR	wex_hpalette;
+	LONG		wex_x;			// position of window's center on bitmap
+	LONG		wex_y;			// ----"----"----"----"----"----"----"----
+	float		wex_scale;		// bitmap scale	(32 bit for GetWindowLong)
+	LONG		wex_mouse_x;		// position of mouse on mouse lbuttondown
+	LONG		wex_mouse_y;
+	LONG		wex_x0;			// wex_x and wex_y on mouse lbuttondown
+	LONG		wex_y0;
+};
+
+#define WBMP_OFFSET(member)	(size_t)(&((struct wbmp_wnd_extra*)0)->member)
 
 HANDLE            hInstance;
 
@@ -39,7 +54,7 @@ static BOOL       printer_units = FALSE;
 static BOOL       active;
 static int        dpix, dpiy;
 static int        prt_dpix, prt_dpiy;
-static UINT       timerid;
+static UINT_PTR   timerid;
 static BOOL       inwork;
 static LOGFONT    lfMark;                 // font description
 static UINT       lfMarkSize;             // font size, in points
@@ -51,7 +66,6 @@ static UINT       nBppImage;              // count of colors in bitmap
 static wchar_t    bmpgen[] = L"Bitmap Generator";
 
 // ----------------------- fill wanted map ------------------------------
-static BOOL OnBmpQueryNewPalette( HWND hwnd );
 
 static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, UINT height, int marksize, int repsize )
 {
@@ -98,65 +112,70 @@ RETURN:
 }
 
 
-static void CreatePreviewBitmap( HWND hwnd, LPDIB pdib )
+static void AssignPreviewBitmap( HWND hwnd, LPDIB pdib )
 {
-	HWND     hwndPreview = (HWND)NULL;
 	HBITMAP  hbmpPreview, holdbmp;
 	HDC      hwindc;
-	HPALETTE hpal;
+	HPALETTE hpal = (HPALETTE)0, holdpal = (HPALETTE)0;
 	BOOL     a = FALSE;
+	union {
+		float	F;
+		LONG	L;
+	}    xm, ym;
+	RECT     winrc;
 
-	if ( pdib && hwnd && fUpdatePicture ) {
-		hwndPreview = GetDlgItem( hwnd, IDC_BITMAP );
-		if ( !hwndPreview ) return;
+	if ( pdib && hwnd ) {
+		GetClientRect( hwnd, &winrc );
 
 		hwindc = GetDC( hwnd );
+		if ( RC_PALETTE == ( GetDeviceCaps( hwindc, RASTERCAPS ) & RC_PALETTE ) ) {
+			hpal = CreateDIBPalette( pdib );
+			if ( hpal ) {
+				holdpal = SelectPalette( hwindc, hpal, TRUE );
+				if ( holdpal ) DeletePalette( holdpal );
+				RealizePalette( hwindc );
+			}
+		}
 		hbmpPreview = CreateDDBfromDIB( hwindc, pdib );
 		ReleaseDC( hwnd, hwindc );
 
-		holdbmp = (HBITMAP)SetWindowLong( hwndPreview, 0, (LONG)hbmpPreview );
+		holdbmp = (HBITMAP)SetWindowLongPtr( hwnd, WBMP_OFFSET( wex_hbitmap ), (LONG_PTR)hbmpPreview );
 		if ( holdbmp ) DeleteObject( holdbmp );
-		hpal = (HPALETTE)SetWindowLong( hwndPreview, 4, (LONG)CreateDIBPalette( pdib ) );
-		if ( hpal ) DeleteObject( hpal );
+		holdpal = (HPALETTE)SetWindowLongPtr( hwnd, WBMP_OFFSET( wex_hpalette ), (LONG_PTR)CreateDIBPalette( pdib ) );
+		if ( holdpal ) DeleteObject( holdpal );
+
+		SetWindowLong( hwnd, WBMP_OFFSET( wex_x ), pdib->biWidth / 2 );
+		SetWindowLong( hwnd, WBMP_OFFSET( wex_y ), ( pdib->biHeight < 0 ? -pdib->biHeight : pdib->biHeight ) / 2 );
+		xm.F = ( (float)( winrc.right - winrc.left - 2*PREVIEW_FOLDER_WIDTH ) ) / pdib->biWidth;
+		if ( xm.F > 1.0 ) xm.F = 1.0;
+		ym.F = ( (float)( winrc.bottom - winrc.top - 2 * PREVIEW_FOLDER_WIDTH ) ) / ( pdib->biHeight < 0 ? -pdib->biHeight : pdib->biHeight );
+		if ( ym.F > 1.0 ) ym.F = 1.0;
+		LONG lrepr = xm.F < ym.F ? xm.L : ym.L;
+		SetWindowLong( hwnd, WBMP_OFFSET( wex_scale ), lrepr );
+		a = TRUE;
 	}
-	if ( !a ) SetWindowText( hwndPreview, L"flow1" );
-	if ( !OnBmpQueryNewPalette( hwndPreview ) ) InvalidateRect( hwndPreview, NULL, TRUE );
 }
 
 
 
 // ------------------ bitmap shower child window ------------------
-static BOOL InRealize;
 
 static BOOL OnBmpCreate( HWND hwnd, CREATESTRUCT* lpCreateStruct )
 {
 	wchar_t		text[ 128 ];
-	HBITMAP		hbmp = (HBITMAP)0L;
 	HPALETTE	hpal = (HPALETTE)0L, hpalold = (HPALETTE)0L;
 	struct OWNRES	own;
-	LPDIB		lpb;
-	HDC		hdc;
+	LPDIB		pdib;
 
 	UNUSED_ARG( lpCreateStruct );
 
 	GetWindowText( hwnd, text, sizeof( text ) / sizeof( text[ 0 ] ) );
 	if ( text[ 0 ] ) {
 		own.hInstance = hInstance;
-		lpb = (LPDIB)LoadOwnResource( &own, text, (LPWSTR)RT_BITMAP );
-		if ( lpb ) {
-			hpal = CreateDIBPalette( lpb );
-			hdc = GetDC( hwnd );
-			if ( hpal ) {
-				hpalold = SelectPalette( hdc, hpal, FALSE );
-				RealizePalette( hdc );
-			}
-			hbmp = CreateDDBfromDIB( hdc, lpb );
-			if ( hpalold ) SelectPalette( hdc, hpalold, FALSE );
-			ReleaseDC( hwnd, hdc );
+		pdib = (LPDIB)LoadOwnResource( &own, text, (LPWSTR)RT_BITMAP );
+		if ( pdib ) {
+			AssignPreviewBitmap( hwnd, pdib );
 			FreeOwnResource( &own );
-
-			SetWindowLong( hwnd, 0, (LONG)hbmp );
-			SetWindowLong( hwnd, 4, (LONG)hpal );
 		}
 	}
 	return TRUE;
@@ -165,10 +184,13 @@ static BOOL OnBmpCreate( HWND hwnd, CREATESTRUCT* lpCreateStruct )
 
 static void OnBmpDestroy( HWND hwnd )
 {
-	HBITMAP     hbmp = (HBITMAP)SetWindowLong( hwnd, 0, 0L );
-	HPALETTE    hpal = (HPALETTE)SetWindowLong( hwnd, 4, 0L );
+	HBITMAP     hbmp = (HBITMAP)SetWindowLongPtr( hwnd, WBMP_OFFSET( wex_hbitmap ), 0 );
+	HPALETTE    hpal = (HPALETTE)SetWindowLongPtr( hwnd, WBMP_OFFSET( wex_hpalette ), 0 );
 	if ( hbmp ) DeleteBitmap( hbmp );
-	if ( hpal ) DeleteBitmap( hpal );
+	if ( hpal ) DeletePalette( hpal );
+	SetWindowLong( hwnd, WBMP_OFFSET( wex_x ), 0 );
+	SetWindowLong( hwnd, WBMP_OFFSET( wex_y ), 0 );
+	SetWindowLong( hwnd, WBMP_OFFSET( wex_scale ), 0 );	// long zero is float zero
 }
 
 
@@ -186,44 +208,87 @@ static BOOL OnBmpEraseBkgnd( HWND hwnd, HDC hdc )
 	HBITMAP        hbmp, hbmpold;
 	HPALETTE       hpal;
 	BITMAP         bmp;
-	RECT           rc, rcb;
+	RECT           winrc;
+	SIZE           winsz;
+	RECT           bmprc;	// bitmap in window coordinates after scaling
+	SIZE           bmpsz;
+	RECT           viewrc;	// visiable part of bitmap in bitmap pixels
+	SIZE           viewsz;
+	RECT           urc;	// used part of window in window coordinates
+	SIZE           usz;	// size of use dpart
 	HDC            hcdc;
-	int            n;
-	LONG           w;
+	LONG           bx, by;
+	union {
+		float	F;
+		LONG	L;
+	}              scale;
 
-	hbmp = (HBITMAP)GetWindowLong( hwnd, 0L );
-	hpal = (HPALETTE)GetWindowLong( hwnd, 4L );
+	hbmp = (HBITMAP)GetWindowLongPtr( hwnd, WBMP_OFFSET( wex_hbitmap ) );
+	hpal = (HPALETTE)GetWindowLongPtr( hwnd, WBMP_OFFSET( wex_hpalette ) );
+	bx = GetWindowLong( hwnd, WBMP_OFFSET( wex_x ) );		// window center in bitmap coordinates
+	by = GetWindowLong( hwnd, WBMP_OFFSET( wex_y ) );		// window center in bitmap coordinates
+	scale.L = GetWindowLong( hwnd, WBMP_OFFSET( wex_scale ) );	// bitmap scale
 	if ( hbmp ) {
 		GetObject( hbmp, sizeof( bmp ), &bmp );
-		GetClientRect( hwnd, &rc );
+		GetClientRect( hwnd, &winrc );
+		winsz.cx = winrc.right - winrc.left;
+		winsz.cy = winrc.bottom - winrc.top;
 
-		if ( bmp.bmWidth > rc.right || bmp.bmHeight > rc.bottom ) {
-			rcb = rc;
-			w = rcb.bottom * (LONG)( bmp.bmWidth ) / bmp.bmHeight;
-			if ( w > rcb.right ) {
-				rcb.bottom = rcb.right * (LONG)( bmp.bmHeight ) / bmp.bmWidth;
-			} else {
-				rcb.right = w;
-			}
+		urc.left = winrc.left + PREVIEW_FOLDER_WIDTH;
+		urc.top = winrc.top + PREVIEW_FOLDER_WIDTH;
+		urc.right = winrc.right - PREVIEW_FOLDER_WIDTH;
+		urc.bottom = winrc.bottom - PREVIEW_FOLDER_WIDTH;
+		usz.cx = urc.right - urc.left;
+		usz.cy = urc.bottom - urc.top;
+
+		bmprc.left = ( urc.left + urc.right ) / 2 - (LONG)roundf( bx * scale.F );
+		bmprc.right = ( urc.left + urc.right ) / 2 + (LONG)roundf( ( bmp.bmWidth - bx ) * scale.F );
+		bmprc.top = ( urc.top + urc.bottom ) / 2 - (LONG)roundf( by * scale.F );
+		bmprc.bottom = ( urc.top + urc.bottom ) / 2 + (LONG)roundf( ( bmp.bmHeight - by ) * scale.F );
+
+		if ( bmprc.left < urc.left ) {
+			viewrc.left = (LONG)roundf( ( urc.left - bmprc.left ) / scale.F );
+			bmprc.left = urc.left;
 		} else {
-			rcb.left = 0; rcb.top = 0;
-			rcb.right = bmp.bmWidth; rcb.bottom = bmp.bmHeight;
+			viewrc.left = 0;
 		}
+		if ( bmprc.top < urc.top ) {
+			viewrc.top = (LONG)roundf( ( urc.top - bmprc.top ) / scale.F );
+			bmprc.top = urc.top;
+		} else {
+			viewrc.top = 0;
+		}
+		if ( bmprc.right > urc.right ) {
+			viewrc.right = bmp.bmWidth - (LONG)roundf( ( bmprc.right - urc.right ) / scale.F );
+			bmprc.right = urc.right;
+		} else {
+			viewrc.right = bmp.bmWidth;
+		}
+		if ( bmprc.bottom > urc.bottom ) {
+			viewrc.bottom = bmp.bmHeight - (LONG)roundf( ( bmprc.bottom - urc.bottom ) / scale.F );
+			bmprc.bottom = urc.bottom;
+		} else {
+			viewrc.bottom = bmp.bmHeight;
+		}
+		bmpsz.cx = bmprc.right - bmprc.left;
+		bmpsz.cy = bmprc.bottom - bmprc.top;
+		viewsz.cx = viewrc.right - viewrc.left;
+		viewsz.cy = viewrc.bottom - viewrc.top;
 
-		rc.left = ( rc.right - rcb.right ) / 2;
-		rc.top = ( rc.bottom - rcb.bottom ) / 2;
-		if ( rc.top > 0 ) {
-			PatBlt( hdc, 0, 0, rc.right, rc.top, PATCOPY );
-			PatBlt( hdc, 0, rc.bottom - rc.top - 1, rc.right, rc.top, PATCOPY );
-			n = rc.top;
-		} else n = 0;
-		if ( rc.left > 0 ) {
-			PatBlt( hdc, 0, n, rc.left, rc.bottom - 2 * n, PATCOPY );
-			PatBlt( hdc, rc.right - rc.left - 1, n, rc.left, rc.bottom - 2 * n, PATCOPY );
-		}
+		SelectBrush( hdc, CreateSolidBrush( RGB( 240, 240, 240 ) ) );
+		PatBlt( hdc, 0, 0, bmprc.left, winrc.bottom, PATCOPY );				// left side
+		PatBlt( hdc, bmprc.left, 0, winrc.right-bmprc.left, bmprc.top, PATCOPY );	// top side
+		PatBlt( hdc, bmprc.right, bmprc.top, winrc.right - bmprc.right, winrc.bottom - bmprc.top, PATCOPY );	// right side
+		PatBlt( hdc, bmprc.left, bmprc.bottom, bmprc.right - bmprc.left, winrc.bottom - bmprc.bottom, PATCOPY );	// bottom side
+		DeleteBrush( SelectBrush( hdc, GetStockBrush( WHITE_BRUSH ) ) );
+
 		hcdc = CreateCompatibleDC( hdc );
 		hbmpold = SelectBitmap( hcdc, hbmp );
-		StretchBlt( hdc, rc.left, rc.top, rcb.right, rcb.bottom, hcdc, 0, 0, bmp.bmWidth, bmp.bmHeight, SRCCOPY );
+		if ( hpal ) {
+			SelectPalette( hdc, hpal, TRUE );
+			RealizePalette( hdc );
+		}
+		StretchBlt( hdc, bmprc.left, bmprc.top, bmpsz.cx, bmpsz.cy, hcdc, viewrc.left, viewrc.top, viewsz.cx, viewsz.cy, SRCCOPY );
 		SelectBitmap( hcdc, hbmpold );
 		DeleteDC( hcdc );
 		return TRUE;
@@ -237,58 +302,88 @@ static BOOL OnBmpQueryNewPalette( HWND hwnd )
 	int		count = 0;
 	HDC		hdc;
 	HPALETTE	hpal, hpalold = (HPALETTE)NULL;
-	HBITMAP		hbmp;
-	struct OWNRES	own;
-	wchar_t		text[ 80 ];
-	LPDIB		lpb;
-
-	if ( InRealize ) return FALSE;
-	InRealize = TRUE;
-
-	hdc = GetDC( hwnd );
-	hpal = (HPALETTE)GetWindowLong( hwnd, 4 );
-	if ( active ) {
-		GetWindowText( hwnd, text, sizeof( text ) / sizeof( text[ 0 ] ) );
-		if ( !text[ 0 ] ) goto STD;
-
-		hbmp = (HBITMAP)GetWindowLong( hwnd, 0 );
-		if ( hbmp ) { DeleteObject( hbmp ); hbmp = (HBITMAP)0L; }
-
-		own.hInstance = hInstance;
-		lpb = (LPDIB)LoadOwnResource( &own, text, (LPWSTR)RT_BITMAP );
-		if ( lpb ) {
-			if ( !hpal ) {
-				hpal = CreateDIBPalette( lpb );
-				SetWindowLong( hwnd, 4, (LONG)hpal );
-			}
-			if ( hpal ) {
-				hpalold = SelectPalette( hdc, hpal, FALSE );
-				RealizePalette( hdc );
-			}
-			hbmp = CreateDDBfromDIB( hdc, lpb );
-			if ( hpalold ) SelectPalette( hdc, hpalold, FALSE );
-			FreeOwnResource( &own );
-			InvalidateRect( hwnd, NULL, TRUE );
-		}
-		SetWindowLong( hwnd, 0, (LONG)hbmp );
-	} else {
-		// inactive window
-STD:
-		if ( hpal ) {
-			hpalold = SelectPalette( hdc, hpal, FALSE );
-			count = RealizePalette( hdc );      // count = count of remapped entries
-			SelectPalette( hdc, hpalold, FALSE );
-			if ( count ) InvalidateRect( hwnd, NULL, TRUE );   // redraw all, when changed
-		}
+	hpal = (HPALETTE)GetWindowLongPtr( hwnd, WBMP_OFFSET( wex_hpalette ) );
+	if ( hpal ) {
+		hdc = GetDC( hwnd );
+		hpalold = SelectPalette( hdc, hpal, TRUE );
+		count = RealizePalette( hdc );      // count = count of remapped entries
+		if ( count ) InvalidateRect( hwnd, NULL, TRUE );   // redraw all, when changed
+		ReleaseDC( hwnd, hdc );
+		return TRUE;
 	}
-	ReleaseDC( hwnd, hdc );
-
-	InRealize = FALSE;
-	return count ? TRUE : FALSE;
+	return FALSE;
 }
 
 
-LONG WINAPI WndBitmapProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
+void OnBmpPaletteChanged( HWND hwnd, HWND hwndPaletteChange )
+{
+	HDC		hdc;
+	HPALETTE	hpal, hpalold;
+	int		count;
+
+	hpal = (HPALETTE)GetWindowLongPtr( hwnd, WBMP_OFFSET( wex_hpalette ) );
+	if ( hpal ) {
+		hdc = GetDC( hwnd );
+		hpalold = SelectPalette( hdc, hpal, FALSE );
+		count = RealizePalette( hdc );      // count = count of remapped entries
+		UpdateColors( hdc );
+		ReleaseDC( hwnd, hdc );
+	}
+}
+
+
+void OnBmpMouseWheel( HWND hwnd, int xPos, int yPos, int zDelta, UINT fwKeys )
+{
+	union {
+		float	F;
+		LONG	L;
+	} scale;
+
+	scale.L = GetWindowLong( hwnd, WBMP_OFFSET( wex_scale ) );
+	if ( zDelta > 0 ) {
+		scale.F *= 1.1F;
+	} else {
+		scale.F /= 1.1F;
+	}
+	SetWindowLong( hwnd, WBMP_OFFSET( wex_scale ), scale.L );
+	InvalidateRect( hwnd, NULL, TRUE );
+}
+
+
+void OnBmpMouseMove( HWND hwnd, int x, int y, UINT keyFlags )
+{
+	union {
+		float	F;
+		LONG	L;
+	} scale;
+	LONG	X, Y;
+
+	if ( keyFlags == MK_LBUTTON ) {
+		scale.L = GetWindowLong( hwnd, WBMP_OFFSET( wex_scale ) );
+
+		x -= GetWindowLong( hwnd, WBMP_OFFSET( wex_mouse_x ) );
+		y -= GetWindowLong( hwnd, WBMP_OFFSET( wex_mouse_y ) );
+		X = GetWindowLong( hwnd, WBMP_OFFSET( wex_x0 ) );
+		Y = GetWindowLong( hwnd, WBMP_OFFSET( wex_y0 ) );
+		X -= (LONG)roundf( x / scale.F );
+		Y -= (LONG)roundf( y / scale.F );
+		SetWindowLong( hwnd, WBMP_OFFSET( wex_x ), X );
+		SetWindowLong( hwnd, WBMP_OFFSET( wex_y ), Y );
+		InvalidateRect( hwnd, NULL, TRUE );
+	}
+}
+
+
+void OnBmpLButtonDown( HWND hwnd, BOOL fDoubleClick, int x, int y, UINT keyFlags )
+{
+	SetWindowLong( hwnd, WBMP_OFFSET( wex_mouse_x ), (LONG)x );
+	SetWindowLong( hwnd, WBMP_OFFSET( wex_mouse_y ), (LONG)y );
+	SetWindowLong( hwnd, WBMP_OFFSET( wex_x0 ), GetWindowLong( hwnd, WBMP_OFFSET( wex_x ) ) );
+	SetWindowLong( hwnd, WBMP_OFFSET( wex_y0 ), GetWindowLong( hwnd, WBMP_OFFSET( wex_y ) ) );
+}
+
+
+LRESULT CALLBACK WndBitmapProc( HWND hwnd, UINT wmsg, WPARAM wParam, LPARAM lParam )
 {
 	switch ( wmsg ) {
 	HANDLE_MSG( hwnd, WM_CREATE, OnBmpCreate );
@@ -296,6 +391,10 @@ LONG WINAPI WndBitmapProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
 	HANDLE_MSG( hwnd, WM_ERASEBKGND, OnBmpEraseBkgnd );
 	HANDLE_MSG( hwnd, WM_DESTROY, OnBmpDestroy );
 	HANDLE_MSG( hwnd, WM_QUERYNEWPALETTE, OnBmpQueryNewPalette );
+	HANDLE_MSG( hwnd, WM_PALETTECHANGED, OnBmpPaletteChanged );
+	HANDLE_MSG( hwnd, WM_MOUSEWHEEL, OnBmpMouseWheel );
+	HANDLE_MSG( hwnd, WM_MOUSEMOVE, OnBmpMouseMove );
+	HANDLE_MSG( hwnd, WM_LBUTTONDOWN, OnBmpLButtonDown );
 	}
 	return DefWindowProc( hwnd, wmsg, wParam, lParam );
 }
@@ -467,6 +566,14 @@ static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 	UINT        encoding;
 	UNUSED_ARG( codeNotify );
 
+	// we must pass focus to parent window before disabling current focused window 
+	// ((
+	//	this needs for WM_MOUSEWHEEL message which is sent to focused window (or forwarded to parent by DefWindowProc)
+	//	when focused window becomes disabled, then focus is lost and enabling later does not restore
+	//	normal WM_MOUSEWHEEL processing
+	// ))
+	SetFocus( hwnd );	
+
 	Button_Enable( hwndCtl, FALSE );
 	// check source data
 	GetDlgItemText( hwnd, IDC_INPUT, infile, sizeof( infile ) / sizeof( infile[ 0 ] ) );
@@ -520,7 +627,11 @@ static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 		(int)GetDlgItemInt( hwnd, IDC_REPSIZE, NULL, FALSE )
 	);
 	if ( hbmp ) {
-		CreatePreviewBitmap( hwnd, pdib );
+		if ( fUpdatePicture ) {
+			HWND	hwndPreview = GetDlgItem( hwnd, IDC_BITMAP );
+			AssignPreviewBitmap( hwndPreview, pdib );
+			InvalidateRect( hwndPreview, NULL, TRUE );
+		}
 		if ( pdib ) {
 			SaveDIB( outfile, pdib );
 			FreeDIBWithDDB( pdib, hbmp );
@@ -960,7 +1071,11 @@ HBRUSH OnDlgCtlColor( HWND hwnd, HDC hdc, HWND hwndChild, int type )
 	switch ( type ) {
 	case CTLCOLOR_BTN:
 	case CTLCOLOR_STATIC:
+#ifdef _WIN64
+		hbr = (HBRUSH)GetClassLongPtr( hwnd, GCLP_HBRBACKGROUND );
+#else
 		hbr = (HBRUSH)GetClassLong( hwnd, GCL_HBRBACKGROUND );
+#endif
 		SelectObject( hdc, hbr );
 		SetBkColor( hdc, RGB( 192, 192, 192 ) );
 		break;
@@ -983,7 +1098,8 @@ static void OnDlgDestroy( HWND hwnd )
 static void OnDlgPaletteChanged( HWND hwnd, HWND hwndPaletteChange )
 {
 	if ( hwnd != hwndPaletteChange ) {
-		FORWARD_WM_QUERYNEWPALETTE( hwnd, SendMessage );
+//		FORWARD_WM_QUERYNEWPALETTE( hwnd, SendMessage );
+		FORWARD_WM_PALETTECHANGED( GetDlgItem( hwnd, IDC_BITMAP ), hwndPaletteChange, SendMessage );
 	}
 }
 
@@ -1013,7 +1129,13 @@ static void OnDlgTimer( HWND hwnd, UINT id )
 }
 
 
-LONG WINAPI DlgWindowProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
+void OnDlgMouseWheel( HWND hwnd, int xPos, int yPos, int zDelta, UINT fwKeys )
+{
+	FORWARD_WM_MOUSEWHEEL( GetDlgItem( hwnd, IDC_BITMAP ), xPos, yPos, zDelta, fwKeys, PostMessage );
+}
+
+
+LRESULT CALLBACK DlgWindowProc( HWND hwnd, UINT wmsg, WPARAM wParam, LPARAM lParam )
 {
 	switch ( wmsg ) {
 	HANDLE_MSG( hwnd, WM_CREATE, OnDlgCreate );
@@ -1025,13 +1147,14 @@ LONG WINAPI DlgWindowProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
 	HANDLE_MSG( hwnd, WM_CTLCOLORSTATIC, OnDlgCtlColor );
 	HANDLE_MSG( hwnd, WM_PALETTECHANGED, OnDlgPaletteChanged );
 	HANDLE_MSG( hwnd, WM_QUERYNEWPALETTE, OnDlgQueryNewPalette );
+	HANDLE_MSG( hwnd, WM_MOUSEWHEEL, OnDlgMouseWheel );
 	HANDLE_MSG( hwnd, WM_TIMER, OnDlgTimer );
 	}
 	return DefDlgProc( hwnd, wmsg, wParam, lParam );
 }
 
 
-INT_PTR CALLBACK DlgDialogProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
+INT_PTR CALLBACK DlgDialogProc( HWND hwnd, UINT wmsg, WPARAM wParam, LPARAM lParam )
 {
 	switch ( wmsg ) {
 	case WM_INITDIALOG: OnDlgInitDialog( hwnd, (HWND)wParam, lParam ); return TRUE;
@@ -1055,7 +1178,7 @@ int APIENTRY wWinMain( _In_ HINSTANCE hInst, _In_opt_ HINSTANCE hPrev, _In_ LPWS
 		wc.style = 0;
 		wc.lpfnWndProc = WndBitmapProc;
 		wc.cbClsExtra = 0;
-		wc.cbWndExtra = 2 * sizeof( LONG );
+		wc.cbWndExtra = sizeof( struct wbmp_wnd_extra );
 		wc.hInstance = hInst;
 		wc.hIcon = NULL;
 		wc.hCursor = LoadCursor( NULL, IDC_ARROW );
@@ -1071,7 +1194,7 @@ int APIENTRY wWinMain( _In_ HINSTANCE hInst, _In_opt_ HINSTANCE hPrev, _In_ LPWS
 		wc.lpszClassName = szDlgClass;
 		RegisterClass( &wc );
 
-		wc.lpfnWndProc = ResProc;
+		wc.lpfnWndProc = LoadingResultsProc;
 		wc.hIcon = NULL;
 		wc.lpszClassName = szResClass;
 		RegisterClass( &wc );

@@ -32,6 +32,6 @@ int     MapDraw(
 	BOOL  fMetric
 );
 
-LONG	WINAPI	ResProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam );
+LRESULT	CALLBACK LoadingResultsProc( HWND hwnd, UINT wmsg, WPARAM wParam, LPARAM lParam );
 HBRUSH		OnDlgCtlColor( HWND hwnd, HDC hdc, HWND hwndChild, int type );
 BOOL		OnDlgEraseBkgnd( HWND hwnd, HDC hdc );

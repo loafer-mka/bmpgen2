@@ -92,16 +92,16 @@ static void OnResCommand( HWND hwnd, int id, HWND hwndCtl, UINT codeNotify )
 }
 
 
-LONG WINAPI ResProc( HWND hwnd, UINT wmsg, UINT wParam, LONG lParam )
+LRESULT CALLBACK LoadingResultsProc( HWND hwnd, UINT wmsg, WPARAM wParam, LPARAM lParam )
 {
 	switch ( wmsg ) {
 	case WM_USER + 1000:
 		return OnResStart( hwnd, GetDlgItem( hwnd, IDC_RESULTS ) );
-		HANDLE_MSG( hwnd, WM_CREATE, OnResCreate );
-		HANDLE_MSG( hwnd, WM_COMMAND, OnResCommand );
-		HANDLE_MSG( hwnd, WM_ERASEBKGND, OnDlgEraseBkgnd );
-		HANDLE_MSG( hwnd, WM_CTLCOLORBTN, OnDlgCtlColor );
-		HANDLE_MSG( hwnd, WM_CTLCOLORSTATIC, OnDlgCtlColor );
+	HANDLE_MSG( hwnd, WM_CREATE, OnResCreate );
+	HANDLE_MSG( hwnd, WM_COMMAND, OnResCommand );
+	HANDLE_MSG( hwnd, WM_ERASEBKGND, OnDlgEraseBkgnd );
+	HANDLE_MSG( hwnd, WM_CTLCOLORBTN, OnDlgCtlColor );
+	HANDLE_MSG( hwnd, WM_CTLCOLORSTATIC, OnDlgCtlColor );
 	}
 	return DefDlgProc( hwnd, wmsg, wParam, lParam );
 }
@@ -402,7 +402,7 @@ int MapDraw(
 	p0.y = 0;	p0.x += pw.x;
 	for ( ; p0.x <= fmap.east; p0.x += pw.x ) {
 		g2d( &p0, &p );   MoveToEx( hdc, (int)p.x, (int)fdraw.top + D, &pt ); LineTo( hdc, (int)p.x, (int)fdraw.bottom - D );
-		ws = spatialtoa( p0.x ); n = wcslen( ws );
+		ws = spatialtoa( p0.x ); n = (int)wcslen( ws );
 		GetTextExtentPoint( hdc, ws, n, (LPSIZE)&pt );
 		pt.x /= 2;
 		if ( p.x - pt.x < (int)fdraw.left ) p.x = (int)fdraw.left; else {
@@ -420,7 +420,7 @@ int MapDraw(
 	for ( ; p0.y <= fmap.north; p0.y += pw.y ) {
 		if ( p0.y > geo_90 ) break;
 		g2d( &p0, &p );   MoveToEx( hdc, (int)fdraw.left, (int)p.y, &pt ); LineTo( hdc, (int)fdraw.right - D, (int)p.y );
-		ws = spatialtoa( p0.y ); n = wcslen( ws );
+		ws = spatialtoa( p0.y ); n = (int)wcslen( ws );
 		GetTextExtentPoint( hdc, ws, n, (LPSIZE)&pt );
 		pt.x /= 2;
 		if ( p.y - pt.x < fdraw.top ) p.y = fdraw.top + pt.x * 2; else {
@@ -440,7 +440,7 @@ int MapDraw(
 	for ( lpri = GetRootRep(); lpri; lpri = lpri->next ) {     // loop for .rep files
 		if ( lpri->dp < pw.y ) continue;
 		lprp = (reppoint_P)( lpri + 1 );
-		for ( T = lpri->points; T > 0L; --T, lprp++ ) {  // loop for rep. points
+		for ( T = (geo_t)lpri->points; T > 0L; --T, lprp++ ) {  // loop for rep. points
 			if (
 				lprp->pt.x > fmap.west &&
 				lprp->pt.x < fmap.east &&
@@ -455,8 +455,7 @@ int MapDraw(
 					Ellipse( hdc, (int)p.x - Dtx, (int)p.y - Dty, (int)p.x + Dtx, (int)p.y + Dty );    // draw reper point
 				}
 				if ( ( lprp->dn >= (long)pw.y ) && lprp->name ) {   // draw name
-					n = wcslen( lprp->name );
-					pt.x = pt.y = 0;
+					pt.x = pt.y = 0;	n = (int)wcslen( lprp->name );
 					GetTextExtentPoint( hdc, lprp->name, n, (LPSIZE)&pt );
 					i = (int)( p.y - Dry - D - pt.y + tm.tmDescent );
 					if ( i > fdraw.top ) p.y = i; else p.y += Dry;

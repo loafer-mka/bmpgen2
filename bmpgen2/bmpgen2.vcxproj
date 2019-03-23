@@ -186,6 +186,10 @@
     <Image Include="RSRS\flow07.bmp" />
     <Image Include="RSRS\pansy7.bmp" />
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\readme.rus.txt" />
+    <Text Include="..\readme.txt" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

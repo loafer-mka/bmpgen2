@@ -29,7 +29,7 @@ int     MapDraw(
 	HDC hdc, wchar_t *fname, UINT encoding, UINT width, UINT height, int dpix, int dpiy,
 	int marksize, LPLOGFONT lplfMark, int lfMarkSize,
 	int repsize, LPLOGFONT lplfRep, int lfRepSize,
-	BOOL  fMetric
+	BOOL  fMetric, BOOL fColored
 );
 
 LRESULT	CALLBACK LoadingResultsProc( HWND hwnd, UINT wmsg, WPARAM wParam, LPARAM lParam );

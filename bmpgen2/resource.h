@@ -19,14 +19,16 @@
 #define IDC_PRINTER                     1013
 #define IDC_UNITS                       1014
 #define IDC_MARKSIZE                    1015
-#define IDC_MARKFONT                    1017
-#define IDC_REPSIZE                     1018
-#define IDC_REPFONT                     1019
-#define IDC_AUTO                        1020
-#define IDC_UPDPICTURE                  1021
-#define IDC_BPP                         1022
-#define IDC_ENCODING                    1023
-#define IDC_BITMAP                      1024
+#define IDC_XUNITS                      1016
+#define IDC_YUNITS                      1017
+#define IDC_MARKFONT                    1018
+#define IDC_REPSIZE                     1019
+#define IDC_REPFONT                     1020
+#define IDC_AUTO                        1021
+#define IDC_UPDPICTURE                  1022
+#define IDC_BPP                         1023
+#define IDC_ENCODING                    1024
+#define IDC_BITMAP                      1025
 #define IDC_RESULTS                     1040
 #define IDC_STATIC                      -1
 

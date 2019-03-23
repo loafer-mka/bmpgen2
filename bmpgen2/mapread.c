@@ -227,7 +227,7 @@ int MapDraw(
 	HDC hdc, wchar_t *fname, UINT encoding, UINT width, UINT height, int dpix, int dpiy,
 	int marksize, LPLOGFONT lplf, int lfSize,
 	int repsize, LPLOGFONT lplfRep, int lfRepSize,
-	BOOL fMetric
+	BOOL fMetric, BOOL fColored
 )
 {
 	// width and height are width and height of bitmap, in pixels
@@ -247,7 +247,7 @@ int MapDraw(
 	char		temp_buf[ FILE_BUFFER_SIZE ];
 	wchar_t		line_buf[ LINE_BUFFER_SIZE ];
 	POINT		pt;
-	HPEN		hpen[ 13 ];
+	HPEN		hpen[ 14 ];
 	HFONT		hfont;
 	TEXTMETRIC	tm;
 #define G2G(g,m,s)		((g)+(m)/geo_60+(s)/geo_3600)
@@ -335,8 +335,8 @@ int MapDraw(
 	if ( Drx < 1 ) Drx = 1;
 	Dry = dpiy * 100L * repsize / ( 2 * INCH );
 	if ( Dry < 1 ) Dry = 1;
-	hpen[ 0 ] = CreatePen( PS_SOLID, D, RGB( 255, 255, 255 ) );    // #0  white         0.1 mm
-	hpen[ 1 ] = CreatePen( PS_SOLID, D, RGB( 0, 0, 0 ) );          // #1  black         0.1 mm
+	hpen[ 0 ] = CreatePen( PS_SOLID, D, RGB( 255, 255, 255 ) );      // #0  white         0.1 mm
+	hpen[ 1 ] = CreatePen( PS_SOLID, D, RGB( 0, 0, 0 ) );            // #1  black         0.1 mm
 	hpen[ 2 ] = CreatePen( PS_SOLID, D * 2, RGB( 0, 0, 0 ) );        // #2  black         0.2 mm
 	hpen[ 3 ] = CreatePen( PS_SOLID, D * 3, RGB( 0, 0, 0 ) );        // #3  black         0.3 mm
 	hpen[ 4 ] = CreatePen( PS_SOLID, D * 5, RGB( 0, 0, 0 ) );        // #4  black         0.5 mm
@@ -344,13 +344,15 @@ int MapDraw(
 	hpen[ 6 ] = CreatePen( PS_SOLID, D * 10, RGB( 0, 0, 0 ) );       // #6  black         1.0 mm
 	hpen[ 7 ] = CreatePen( PS_SOLID, D * 15, RGB( 0, 0, 0 ) );       // #7  black         1.5 mm
 	hpen[ 8 ] = CreatePen( PS_SOLID, D * 20, RGB( 0, 0, 0 ) );       // #8  black         2.0 mm
-	hpen[ 9 ] = CreatePen( PS_DOT, 1, RGB( 0, 0, 0 ) );            // #9  dot           thin
-	hpen[ 10 ] = CreatePen( PS_DASH, 1, RGB( 0, 0, 0 ) );          // #10 dash          thin
-	hpen[ 11 ] = CreatePen( PS_DASHDOT, 1, RGB( 0, 0, 0 ) );       // #11 dash-dot      thin
-	hpen[ 12 ] = CreatePen( PS_DASHDOTDOT, 1, RGB( 0, 0, 0 ) );    // #12 dash-dot-dot  thin
-	SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
+	hpen[ 9 ] = CreatePen( PS_DOT, 1, RGB( 0, 0, 0 ) );              // #9  dot           thin
+	hpen[ 10 ] = CreatePen( PS_DASH, 1, RGB( 0, 0, 0 ) );            // #10 dash          thin
+	hpen[ 11 ] = CreatePen( PS_DASHDOT, 1, RGB( 0, 0, 0 ) );         // #11 dash-dot      thin
+	hpen[ 12 ] = CreatePen( PS_DASHDOTDOT, 1, RGB( 0, 0, 0 ) );      // #12 dash-dot-dot  thin
+	//
+	hpen[ 13 ] = CreatePen( PS_SOLID, D, RGB( 128, 128, 128 ) );     // #1  gray          0.1 mm
 
 	// draw map
+	SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
 	for ( lpm = GetRootArc(); lpm; lpm = lpm->next ) {   // loop for maps
 		if (
 			lpm->area.west >= fmap.east ||
@@ -378,7 +380,12 @@ int MapDraw(
 	// erase frame and draw border
 	if ( fdraw.left ) PatBlt( hdc, 0, 0, (int)fdraw.left, height, PATCOPY );
 	if ( height != (UINT)fdraw.bottom ) PatBlt( hdc, 0, (int)fdraw.bottom, width, height - (int)fdraw.bottom, PATCOPY );
-	SelectObject( hdc, hpen[ 1 ] );
+	if ( fColored ) {
+		SelectObject( hdc, hpen[ 13 ] );    npen = (WORD)13;
+		SetTextColor( hdc, RGB( 128, 128, 128 ) );
+	} else {
+		SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
+	}
 	MoveToEx( hdc, (int)fdraw.left, (int)fdraw.top + D, &pt ); LineTo( hdc, (int)fdraw.left, (int)fdraw.bottom - D - 1 );
 	LineTo( hdc, (int)fdraw.right - D - 1, (int)fdraw.bottom - D - 1 );    LineTo( hdc, (int)fdraw.right - D - 1, (int)fdraw.top + D );
 	LineTo( hdc, (int)fdraw.left, (int)fdraw.top + D );
@@ -429,6 +436,11 @@ int MapDraw(
 		}
 		TextOut( hdc, (int)fdraw.left - D, (int)p.y, ws, n );
 	}
+	if ( fColored ) {
+		// revert gray to black
+		SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
+		SetTextColor( hdc, RGB( 0, 0, 0 ) );
+	}
 
 	// draw reper points
 	lplfRep->lfEscapement = lplfRep->lfOrientation = 0;
@@ -469,7 +481,7 @@ int MapDraw(
 	DeleteObject( SelectObject( hdc, GetStockObject( SYSTEM_FONT ) ) );
 	SetBkMode( hdc, OPAQUE );
 
-	// pass #2 - draw points
+	// pass #2 - draw mark points
 	e_fseek( &infile, 0L, SEEK_SET );
 	e_fgets( line_buf, sizeof( line_buf ) / sizeof( line_buf[ 0 ] ), &infile );
 	trimline( s = bow( line_buf ) );	/* skip title */

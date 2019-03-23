@@ -97,4 +97,8 @@
       <Filter>Файлы ресурсов</Filter>
     </Image>
   </ItemGroup>
+  <ItemGroup>
+    <Text Include="..\readme.rus.txt" />
+    <Text Include="..\readme.txt" />
+  </ItemGroup>
 </Project>

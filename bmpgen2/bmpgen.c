@@ -97,7 +97,7 @@ static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, 
 		width, height, dpix, dpiy,
 		marksize, &lfMark, lfMarkSize,
 		repsize, &lfRep, lfRepSize,
-		TRUE
+		TRUE, nBppImage > 1
 	) ) {
 		MessageBox( NULL, L"Cannot open data file", bmpgen, MB_OK | MB_ICONEXCLAMATION );
 		goto RETURN;
@@ -497,7 +497,16 @@ static BOOL OnDlgCreate( HWND hwnd, CREATESTRUCT FAR* lpCreateStruct )
 
 static void OnDlgClose( HWND hwnd )
 {
-	DestroyWindow( hwnd );
+	FORWARD_WM_COMMAND( hwnd, IDOK, GetDlgItem( hwnd, IDOK ), BN_CLICKED, SendMessage );
+}
+
+
+static void ShowXYUnits( HWND hwnd, int u )
+{
+	wchar_t    *units[] = { L"px", L"cm screen", L"\" screen", L"cm printer", L"\" printer", L"dots", L"points", L"twips" };
+
+	SetDlgItemText( hwnd, IDC_XUNITS, units[ u % (sizeof(units)/sizeof(units[0])) ] );
+	SetDlgItemText( hwnd, IDC_YUNITS, units[ u % ( sizeof( units ) / sizeof( units[ 0 ] ) ) ] );
 }
 
 
@@ -512,6 +521,8 @@ static void OnDlgCommandUnits( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 	if ( n0 != n ) {
 		switch ( n ) {
 		default:    // pixels
+			n = 0;
+			// FALL THROUGH
 		case 1:     // scren centimeters
 		case 2:     // screen inches
 			if ( printer_units ) {
@@ -535,6 +546,7 @@ static void OnDlgCommandUnits( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 		}
 		swprintf( txt, sizeof( txt ) / sizeof( txt[ 0 ] ), L"%u", n );
 		WritePrivateProfileString( szOpt, szUnits, txt, szIni );
+		ShowXYUnits( hwnd, n );
 		n0 = n;
 	}
 }
@@ -988,7 +1000,10 @@ static BOOL OnDlgInitDialog( HWND hwnd, HWND hwndFocus, LPARAM lParam )
 	ComboBox_AddString( hw, L"printer dots" );
 	ComboBox_AddString( hw, L"printer points" );
 	ComboBox_AddString( hw, L"twips" );
-	ComboBox_SetCurSel( hw, GetPrivateProfileInt( szOpt, szUnits, 3, szIni ) );
+	y = GetPrivateProfileInt( szOpt, szUnits, 3, szIni );
+	if ( y < 0 || y > 7 ) y = 0;
+	ComboBox_SetCurSel( hw, y );
+	ShowXYUnits( hwnd, y );
 
 	SetFocus( GetDlgItem( hwnd, IDC_GETMAP ) );
 	ChooseDPI( hwnd, DPI_AUTO );
@@ -1098,7 +1113,6 @@ static void OnDlgDestroy( HWND hwnd )
 static void OnDlgPaletteChanged( HWND hwnd, HWND hwndPaletteChange )
 {
 	if ( hwnd != hwndPaletteChange ) {
-//		FORWARD_WM_QUERYNEWPALETTE( hwnd, SendMessage );
 		FORWARD_WM_PALETTECHANGED( GetDlgItem( hwnd, IDC_BITMAP ), hwndPaletteChange, SendMessage );
 	}
 }

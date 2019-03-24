@@ -10,12 +10,22 @@ is carried out on the content of the .dat file of target marks: the program dete
 of the area, taking into account the fields and proportions of the bitmap image, then it selects
 grid spacing and an image is formed that includes all of the indicated marks.
 
-Note: the program was developed in the 90's for Windows 3.10, then, approximately in 1997, modified
+Note 1: the program was developed in the 90's for Windows 3.10, then, approximately in 1997, modified
 for Windows 95. At the time of development, in fact, there were no sources of public spatial data. To draw
 contour liness, reference points, etc. the simplest text formats were used, allowing minimal effort to add
-data from any found source. Later in 2019 adapted to work in modern 64-bit Windows, but this upgrade, however, 
-is minimal and support for modern geodata formats is not implemented at present.
+data from any found source. Later in 2019 adapted to work in modern 64-bit Windows, but this upgrade, 
+however, is minimal and support for modern geodata formats is not implemented at present.
 
+Note 2: partial automation mode is supported, allowing creation a series of images for one set of contour 
+lines and reference points and different target mark sets. To do this, specify a list of files with contour 
+lines, with reference points, specify the name of the bitmap to be created, as well as specify the name of 
+a nonexistent target mark file and select checkbox "wait for input and ...". In this case bmpgen2 goes into 
+standby mode and, as soon as it detects existing mark file, it creates an bitmap image and deletes the input
+mark file.
+The mark file is used to synchronize the execution of the some control program with bmpgen2; it is recommended 
+to create target mark file under any temporary name, then rename it according to how indicated for bmpgen2 and 
+wait for its removal. When bmpgen2 is deleting target mark file, the bitmap file has already been created and 
+can be renamed or moved to the desired folder.
 
             2. Latitude and Longitude Format
 
@@ -56,19 +66,19 @@ Further, for each contour is a block:
 - Further, the block contains latitude and longitude of each point of the contour.
 
 The line style is indicated by a number after the ^ symbol:
-0  - white solid line 0.1 mm (will be visible only if superimposed over black)
-1  - black solid line 0.1 mm
-2  - black solid line 0.2 mm
-3  - black solid line 0.3 mm
-4  - black solid line 0.5 mm
-5  - black solid line 0.7 mm
-6  - black solid line 1.0 mm
-7  - black solid line 1.5 mm
-8  - black solid line 2.0 mm
-9  - thin black dot-dot-dot line
-10 - thin black dash-dash-dash line
-11 - thin black dot-dash line
-12 - thin black dot-dot-dash line
+^0  - white solid line 0.1 mm (will be visible only if superimposed over black)
+^1  - black solid line 0.1 mm
+^2  - black solid line 0.2 mm
+^3  - black solid line 0.3 mm
+^4  - black solid line 0.5 mm
+^5  - black solid line 0.7 mm
+^6  - black solid line 1.0 mm
+^7  - black solid line 1.5 mm
+^8  - black solid line 2.0 mm
+^9  - thin black dot-dot-dot line
+^10 - thin black dash-dash-dash line
+^11 - thin black dot-dash line
+^12 - thin black dot-dot-dash line
 
 
             4. Reference Point File (.rep)

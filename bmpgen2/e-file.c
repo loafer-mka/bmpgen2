@@ -39,9 +39,13 @@ wchar_t *e_fgets( wchar_t *buf, UINT size, struct EFILE *ep )
 	if ( !p ) return NULL;
 	temp[ sz - 1 ] = '\0';
 	sz = strlen( temp ) + 1;
+#ifdef _DEBUG
 	if ( !MultiByteToWideChar( ep->encoding, 0, temp, (int)sz, buf, size ) ) {
 		volatile DWORD	dw = GetLastError();
 	}
+#else
+	MultiByteToWideChar( ep->encoding, 0, temp, (int)sz, buf, size );
+#endif
 	return buf;
 }
 

@@ -18,13 +18,13 @@ static BOOL OnResCreate( HWND hwnd, CREATESTRUCT FAR* lpCreateStruct )
 }
 
 
-static void dlg_cb_proc( char *str, size_t n, va_list ap )
+static void dlg_cb_proc( wchar_t *str, int n, va_list ap )
 {
-	size_t		cnt;
+	int		cnt;
 	HWND		hwndLB;
 
 
-	cnt = va_arg( ap, size_t );
+	cnt = va_arg( ap, int );
 	hwndLB = va_arg( ap, HWND );
 
 	if ( n > cnt ) {
@@ -63,7 +63,7 @@ static LONG OnResStart( HWND hwnd, HWND hwndLB )
 
 		swprintf( txt, sizeof( txt ) / sizeof( txt[ 0 ] ), L"Чтение файла '%s' с картой:", temp );
 		ListBox_AddString( hwndLB, txt );
-		if ( !AddArcFile( temp, dirname_encoding, (add_arc_callback_t)dlg_cb_proc, ListBox_GetCount( hwndLB ), ListBox_GetCount( hwndLB ), hwndLB ) ) {
+		if ( !AddArcFile( temp, dirname_encoding, dlg_cb_proc, ListBox_GetCount( hwndLB ), ListBox_GetCount( hwndLB ), hwndLB ) ) {
 			switch ( errno ) {
 			case ENOMEM:
 				MessageBox( hwnd, L"Некорректный файл или недостаточно ресурсов", mapread, MB_OK | MB_ICONEXCLAMATION );

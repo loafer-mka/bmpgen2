@@ -1126,17 +1126,17 @@ static BOOL OnDlgQueryNewPalette( HWND hwnd )
 
 static void OnDlgTimer( HWND hwnd, UINT id )
 {
-	HFILE    hf;
+	HANDLE    hf;
 	wchar_t  text[ 256 ];
 	UNUSED_ARG( id );
 
 	if ( inwork ) return;
 	GetDlgItemText( hwnd, IDC_INPUT, text, sizeof( text ) / sizeof( text[ 0 ] ) );
 	if ( text[ 0 ] ) {
-		hf = _wopen( text, OF_READ | OF_SHARE_EXCLUSIVE );
-		if ( hf != HFILE_ERROR ) {
-			_lclose( hf );
+		hf = CreateFile( text, GENERIC_READ, 0, NULL, OPEN_EXISTING, FILE_ATTRIBUTE_NORMAL, NULL );
+		if ( hf != INVALID_HANDLE_VALUE ) {
 			inwork = TRUE;
+			CloseHandle( hf );
 			FORWARD_WM_COMMAND( hwnd, IDC_READ, GetDlgItem( hwnd, IDC_READ ), BN_CLICKED, PostMessage );
 		}
 	}

@@ -27,6 +27,7 @@ to create target mark file under any temporary name, then rename it according to
 wait for its removal. When bmpgen2 is deleting target mark file, the bitmap file has already been created and 
 can be renamed or moved to the desired folder.
 
+
             2. Latitude and Longitude Format
 
     01.2345678     angle in degrees as a real number with a point or a comma

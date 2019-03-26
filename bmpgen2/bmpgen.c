@@ -67,7 +67,7 @@ static wchar_t    bmpgen[] = L"Bitmap Generator";
 
 // ----------------------- fill wanted map ------------------------------
 
-static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, UINT height, int marksize, int repsize )
+static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, UINT height, int DPIX, int DPIY, int marksize, int repsize )
 {
 	HDC      hcdc = (HDC)0L;
 	LPDIB    pdib = (LPDIB)0L;
@@ -80,7 +80,7 @@ static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, 
 	}
 
 	HDC hwindc = GetWindowDC( NULL );
-	pdib = CreateDIBWithDDB( hwindc, phbmp, nBppImage, width, height, 96, 96 );
+	pdib = CreateDIBWithDDB( hwindc, phbmp, nBppImage, width, height, DPIX, DPIY );
 	ReleaseDC( NULL, hwindc );
 
 	if ( !*phbmp || !pdib ) {
@@ -568,12 +568,39 @@ static void OnDlgCommandAuto( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 }
 
 
+static double GetDlgItemDouble( HWND hwnd, int id )
+{
+	wchar_t     buf[ 128 ];
+	wchar_t     *b, *p;
+
+	GetDlgItemText( hwnd, id, buf, sizeof( buf ) / sizeof( buf[ 0 ] ) - 1 );
+	buf[ sizeof( buf ) / sizeof( buf[ 0 ] ) - 1 ] = L'\0';
+	b = bow( buf );	// skip spaces
+	p = b;
+	if ( *p == L'+' || *p == L'-' ) p++;
+	while ( *p >= L'0' && *p <= L'9' ) p++;
+	if ( *p == L'.' ) p++; else if ( *p == L',' ) *p++ = L'.';
+	while ( *p >= L'0' && *p <= L'9' ) p++;
+	if ( *p == L'E' || *p == L'e' || *p == L'D' || *p == L'd' ) {
+		// exponent given
+		*p++ = L'E';
+		if ( *p == L'+' || *p == L'-' ) p++;
+		while ( *p >= L'0' && *p <= L'9' ) p++;
+		if ( *p == L'.' ) p++; else if ( *p == L',' ) *p++ = L'.';
+		while ( *p >= L'0' && *p <= L'9' ) p++;
+	}
+	*p = L'\0';
+	return _wtof( b );
+}
+
+
 static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 {
 	wchar_t     infile[ 1024 ];
 	wchar_t     outfile[ 1024 ];
 	LPDIB       pdib;
 	LONG        cx, cy;
+	double      dx, dy;
 	HBITMAP     hbmp;
 	UINT        encoding;
 	UNUSED_ARG( codeNotify );
@@ -600,41 +627,43 @@ static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 		goto RETURN;
 	}
 
-	cx = (LONG)GetDlgItemInt( hwnd, IDC_X, NULL, FALSE );
-	cy = (LONG)GetDlgItemInt( hwnd, IDC_Y, NULL, FALSE );
-	if ( !cx || !cy ) {
+	dx = GetDlgItemDouble( hwnd, IDC_X );
+	dy = GetDlgItemDouble( hwnd, IDC_Y );
+	if ( 0.0 == dx || 0.0 == dy ) {
 		MessageBox( hwnd, L"You must specify size of image", bmpgen, MB_OK | MB_ICONEXCLAMATION );
 		goto RETURN;
 	}
 	switch ( ComboBox_GetCurSel( GetDlgItem( hwnd, IDC_UNITS ) ) ) {
 	default:    // pixels or dots
+		cx = iround( dx );
+		cy = iround( dy );
 		break;
 
 	case 3:     // printer centimeters
 	case 1:     // scren centimeters
-		cx = ( cx * dpix * 10000U ) / INCH;
-		cy = ( cy * dpiy * 10000U ) / INCH;
+		cx = iround( ( dx * dpix * 10000U ) / INCH );
+		cy = iround( ( dy * dpiy * 10000U ) / INCH );
 		break;
 
 	case 4:     // printer inches
 	case 2:     // screen inches
-		cx *= dpix;
-		cy *= dpiy;
+		cx = iround( dx * dpix );
+		cy = iround( dy * dpiy );
 		break;
 
 	case 6:     // points      (one printer point is 1/72")
-		cx = ( cx * dpix ) / 72;
-		cy = ( cy * dpiy ) / 72;
+		cx = iround( ( dx * dpix ) / 72 );
+		cy = iround( ( dy * dpiy ) / 72 );
 		break;
 
 	case 7:     // twips       (one twip is 1/20 of point)
-		cx = ( cx * dpix ) / 1440;
-		cy = ( cy * dpiy ) / 1440;
+		cx = iround( ( dx * dpix ) / 1440 );
+		cy = iround( ( dy * dpiy ) / 1440 );
 		break;
 	}
 
 	pdib = FillMap(
-		infile, encoding, &hbmp, (UINT)cx, (UINT)cy,
+		infile, encoding, &hbmp, (UINT)cx, (UINT)cy, dpix, dpiy,
 		(int)GetDlgItemInt( hwnd, IDC_MARKSIZE, NULL, FALSE ),
 		(int)GetDlgItemInt( hwnd, IDC_REPSIZE, NULL, FALSE )
 	);
@@ -897,13 +926,13 @@ static void OnDlgCommandClose( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 	WritePrivateProfileString( szOpt, szFontRepSize, txt, szIni );
 
 	Edit_GetText( GetDlgItem( hwnd, IDC_MARKSIZE ), txt, sizeof( txt ) / sizeof( txt[ 0 ] ) );
-	WritePrivateProfileString( szOpt, szMrk, txt, szIni );
+	WritePrivateProfileString( szOpt, szMrk, bow(txt), szIni );
 	Edit_GetText( GetDlgItem( hwnd, IDC_REPSIZE ), txt, sizeof( txt ) / sizeof( txt[ 0 ] ) );
-	WritePrivateProfileString( szOpt, szRep, txt, szIni );
+	WritePrivateProfileString( szOpt, szRep, bow(txt), szIni );
 	Edit_GetText( GetDlgItem( hwnd, IDC_X ), txt, sizeof( txt ) / sizeof( txt[ 0 ] ) );
-	WritePrivateProfileString( szOpt, szWidth, txt, szIni );
+	WritePrivateProfileString( szOpt, szWidth, bow(txt), szIni );
 	Edit_GetText( GetDlgItem( hwnd, IDC_Y ), txt, sizeof( txt ) / sizeof( txt[ 0 ] ) );
-	WritePrivateProfileString( szOpt, szHeight, txt, szIni );
+	WritePrivateProfileString( szOpt, szHeight, bow(txt), szIni );
 
 	swprintf( txt, sizeof( txt ) / sizeof( txt[ 0 ] ), szUFmt, Button_GetCheck( GetDlgItem( hwnd, IDC_UPDPICTURE ) ) );
 	WritePrivateProfileString( szOpt, szUpdatePicture, txt, szIni );

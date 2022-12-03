@@ -1,0 +1,57 @@
+#
+# text=true   text    allow CRLF translation (CRLF to LF on worktree->repo, LF to CRLF on repo->worktree)
+# text=false  -text   disable CRLF translation
+# text=auto           try to detect type of file and apply CRLF translation to text files
+# <text is missing>   use core.autocrlf
+# eol=crlf            force CRLF translation (CRLF in worktree, LF in git)
+# eol=lf              replace CRLF with LF on worktree->repo, do nothing on repo->worktree
+# ---
+# crlf        text    old-style crlf option
+# -crlf       -text   ---------
+# crlf=input  eol=lf  ---------
+#
+.gitattributes  eol=lf
+.gitignore      eol=lf
+.nami-version   eol=lf
+*.sh            eol=lf
+*.dbc           eol=lf
+*.ps            eol=crlf
+*.ps2           eol=crlf
+*.bat           eol=crlf
+*.cmd           eol=crlf
+*.txt           eol=crlf
+*.c             text
+*.cpp           text
+*.c++           text
+*.h             text
+*.hpp           text
+*.h++           text
+*.rc            text
+*.cs            eol=crlf
+*.sln           eol=crlf
+*.userprefs     eol=lf
+*.vcproj        eol=crlf
+*.vcproj.*      eol=crlf
+*.vcxproj       eol=crlf
+*.vcxproj.*     eol=crlf
+*.csproj        eol=crlf
+*.csproj.*      eol=crlf
+app.config      eol=crlf
+*.m             eol=crlf
+*.mdl           eol=crlf
+*.a2l           eol=crlf
+*.a2ml          eol=crlf
+*.map          -text
+*.pdb          -text -diff
+*.sdf          -text -diff
+*.suo          -text -diff
+*.pdf          -text -diff
+*.zip          -text -diff
+*.tgz          -text -diff
+*.tar          -text -diff
+*.gz           -text -diff
+*.bzip         -text -diff
+*.bz2          -text -diff
+*.xz           -text -diff
+#
+*               text=auto

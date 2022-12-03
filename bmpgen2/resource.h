@@ -29,6 +29,10 @@
 #define IDC_BPP                         1023
 #define IDC_ENCODING                    1024
 #define IDC_BITMAP                      1025
+#define IDC_DRAW_ARCS                   1026
+#define IDC_DRAW_MARKERS                1027
+#define IDC_DRAW_REPERS                 1028
+#define IDC_DRAW_GRID                   1029
 #define IDC_RESULTS                     1040
 #define IDC_STATIC                      -1
 

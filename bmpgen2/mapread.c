@@ -227,7 +227,7 @@ int MapDraw(
 	HDC hdc, wchar_t *fname, UINT encoding, UINT width, UINT height, int dpix, int dpiy,
 	int marksize, LPLOGFONT lplf, int lfSize,
 	int repsize, LPLOGFONT lplfRep, int lfRepSize,
-	BOOL fMetric, BOOL fColored
+	BOOL fMetric, BOOL fColored, drawings_t what_draw
 )
 {
 	// width and height are width and height of bitmap, in pixels
@@ -352,47 +352,48 @@ int MapDraw(
 	hpen[ 13 ] = CreatePen( PS_SOLID, D, RGB( 128, 128, 128 ) );     // #1  gray          0.1 mm
 
 	// draw map
-	SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
-	for ( lpm = GetRootArc(); lpm; lpm = lpm->next ) {   // loop for maps
-		if (
-			lpm->area.west >= fmap.east ||
-			lpm->area.east <= fmap.west ||
-			lpm->area.north <= fmap.south ||
-			lpm->area.south >= fmap.north
-			) continue;                               // entire map is outbound
-		for ( n = 0; (size_t)n < lpm->outlines; n++ ) {    // loop for outlines
-			lpo = lpm->outline + n;
+	if ( what_draw & DRAW_ARCS ) {
+		SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
+		for ( lpm = GetRootArc(); lpm; lpm = lpm->next ) {   // loop for maps
 			if (
-				lpo->area.west >= fmap.east ||
-				lpo->area.east <= fmap.west ||
-				lpo->area.north <= fmap.south ||
-				lpo->area.south >= fmap.north
-				) continue;                            // entire outline is outbound
+				lpm->area.west >= fmap.east ||
+				lpm->area.east <= fmap.west ||
+				lpm->area.north <= fmap.south ||
+				lpm->area.south >= fmap.north
+				) continue;                               // entire map is outbound
+			for ( n = 0; (size_t)n < lpm->outlines; n++ ) {    // loop for outlines
+				lpo = lpm->outline + n;
+				if (
+					lpo->area.west >= fmap.east ||
+					lpo->area.east <= fmap.west ||
+					lpo->area.north <= fmap.south ||
+					lpo->area.south >= fmap.north
+					) continue;                            // entire outline is outbound
 
-				// outline is overbound us map area; check partitions for drawing
-			if ( npen != lpo->penstyle ) SelectObject( hdc, hpen[ npen = lpo->penstyle ] );
-			//..................................
-			DrawOutline( hdc, (outlinesegment_P)( lpo->point + lpo->points ), lpo->point );
-			//..................................
+					// outline is overbound us map area; check partitions for drawing
+				if ( npen != lpo->penstyle ) SelectObject( hdc, hpen[ npen = lpo->penstyle ] );
+				//..................................
+				DrawOutline( hdc, (outlinesegment_P)( lpo->point + lpo->points ), lpo->point );
+				//..................................
+			}
 		}
 	}
-
 	// erase frame and draw border
 	if ( fdraw.left ) PatBlt( hdc, 0, 0, (int)fdraw.left, height, PATCOPY );
 	if ( height != (UINT)fdraw.bottom ) PatBlt( hdc, 0, (int)fdraw.bottom, width, height - (int)fdraw.bottom, PATCOPY );
-	if ( fColored ) {
-		SelectObject( hdc, hpen[ 13 ] );    npen = (WORD)13;
-		SetTextColor( hdc, RGB( 128, 128, 128 ) );
-	} else {
-		SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
-	}
-	MoveToEx( hdc, (int)fdraw.left, (int)fdraw.top + D, &pt ); LineTo( hdc, (int)fdraw.left, (int)fdraw.bottom - D - 1 );
-	LineTo( hdc, (int)fdraw.right - D - 1, (int)fdraw.bottom - D - 1 );    LineTo( hdc, (int)fdraw.right - D - 1, (int)fdraw.top + D );
-	LineTo( hdc, (int)fdraw.left, (int)fdraw.top + D );
 
-	// draw grid and type coords
-	// we suppose step of grid enought for "888888888" string
-	SetBkMode( hdc, TRANSPARENT );
+	if ( what_draw & DRAW_GRID ) {
+		if ( fColored ) {
+			SelectObject( hdc, hpen[ 13 ] );    npen = (WORD)13;
+			SetTextColor( hdc, RGB( 128, 128, 128 ) );
+		} else {
+			SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
+		}
+		MoveToEx( hdc, (int)fdraw.left, (int)fdraw.top + D, &pt ); LineTo( hdc, (int)fdraw.left, (int)fdraw.bottom - D - 1 );
+		LineTo( hdc, (int)fdraw.right - D - 1, (int)fdraw.bottom - D - 1 );    LineTo( hdc, (int)fdraw.right - D - 1, (int)fdraw.top + D );
+		LineTo( hdc, (int)fdraw.left, (int)fdraw.top + D );
+	}
+
 	lplf->lfEscapement = lplf->lfOrientation = 0;
 	hfont = CreateFontIndirect( lplf );
 	SelectObject( hdc, hfont );
@@ -405,145 +406,154 @@ int MapDraw(
 	for ( n = 0; step[ n ]; n++ ) { pw.x = step[ n ];  if ( p0.x > step[ n + 1 ] ) break; }
 	for ( n = 0; step[ n ]; n++ ) { pw.y = step[ n ];  if ( p0.y > step[ n + 1 ] ) break; }
 	// now 'pw.x' and 'pw.y' are steps of grid in 0.001 of degree
-	SetTextAlign( hdc, TA_LEFT | TA_TOP );
-	p0.x = fmap.west > 0L ? fmap.west - fmod( fmap.west, pw.x ) : fmap.west + fmod( -fmap.west, pw.x );
-	p0.y = 0;	p0.x += pw.x;
-	for ( ; p0.x <= fmap.east; p0.x += pw.x ) {
-		g2d( &p0, &p );   MoveToEx( hdc, (int)p.x, (int)fdraw.top + D, &pt ); LineTo( hdc, (int)p.x, (int)fdraw.bottom - D );
-		ws = spatialtoa( p0.x ); n = (int)wcslen( ws );
-		GetTextExtentPoint( hdc, ws, n, (LPSIZE)&pt );
-		pt.x /= 2;
-		if ( p.x - pt.x < (int)fdraw.left ) p.x = (int)fdraw.left; else {
-			if ( p.x + pt.x > fdraw.right ) p.x = fdraw.right - 2 * pt.x; else p.x -= pt.x;
+
+	// draw grid and type coords
+	// we suppose step of grid enought for "888888888" string
+	if ( what_draw & DRAW_GRID ) {
+		SetBkMode( hdc, TRANSPARENT );
+		SetTextAlign( hdc, TA_LEFT | TA_TOP );
+		p0.x = fmap.west > 0L ? fmap.west - fmod( fmap.west, pw.x ) : fmap.west + fmod( -fmap.west, pw.x );
+		p0.y = 0;	p0.x += pw.x;
+		for ( ; p0.x <= fmap.east; p0.x += pw.x ) {
+			g2d( &p0, &p );   MoveToEx( hdc, (int)p.x, (int)fdraw.top + D, &pt ); LineTo( hdc, (int)p.x, (int)fdraw.bottom - D );
+			ws = spatialtoa( p0.x ); n = (int)wcslen( ws );
+			GetTextExtentPoint( hdc, ws, n, (LPSIZE)&pt );
+			pt.x /= 2;
+			if ( p.x - pt.x < (int)fdraw.left ) p.x = (int)fdraw.left; else {
+				if ( p.x + pt.x > fdraw.right ) p.x = fdraw.right - 2 * pt.x; else p.x -= pt.x;
+			}
+			TextOut( hdc, (int)p.x, (int)fdraw.bottom + D, ws, n );
 		}
-		TextOut( hdc, (int)p.x, (int)fdraw.bottom + D, ws, n );
-	}
-	lplf->lfEscapement = lplf->lfOrientation = 900;
-	hfont = CreateFontIndirect( lplf );
-	DeleteObject( SelectObject( hdc, hfont ) );
-	SetTextAlign( hdc, TA_LEFT | TA_BOTTOM );
-	p0.y = fmap.south > 0L ? fmap.south + pw.y - fmod( fmap.south, pw.y ) : fmap.south + fmod( -fmap.south, pw.y );
-	if ( p0.y < -90000L ) p0.y = -90000L;
-	p0.x = 0;
-	for ( ; p0.y <= fmap.north; p0.y += pw.y ) {
-		if ( p0.y > geo_90 ) break;
-		g2d( &p0, &p );   MoveToEx( hdc, (int)fdraw.left, (int)p.y, &pt ); LineTo( hdc, (int)fdraw.right - D, (int)p.y );
-		ws = spatialtoa( p0.y ); n = (int)wcslen( ws );
-		GetTextExtentPoint( hdc, ws, n, (LPSIZE)&pt );
-		pt.x /= 2;
-		if ( p.y - pt.x < fdraw.top ) p.y = fdraw.top + pt.x * 2; else {
-			if ( p.y + pt.x > fdraw.bottom ) p.y = fdraw.bottom; else p.y += pt.x;
+		lplf->lfEscapement = lplf->lfOrientation = 900;
+		hfont = CreateFontIndirect( lplf );
+		DeleteObject( SelectObject( hdc, hfont ) );
+		SetTextAlign( hdc, TA_LEFT | TA_BOTTOM );
+		p0.y = fmap.south > 0L ? fmap.south + pw.y - fmod( fmap.south, pw.y ) : fmap.south + fmod( -fmap.south, pw.y );
+		if ( p0.y < -90000L ) p0.y = -90000L;
+		p0.x = 0;
+		for ( ; p0.y <= fmap.north; p0.y += pw.y ) {
+			if ( p0.y > geo_90 ) break;
+			g2d( &p0, &p );   MoveToEx( hdc, (int)fdraw.left, (int)p.y, &pt ); LineTo( hdc, (int)fdraw.right - D, (int)p.y );
+			ws = spatialtoa( p0.y ); n = (int)wcslen( ws );
+			GetTextExtentPoint( hdc, ws, n, (LPSIZE)&pt );
+			pt.x /= 2;
+			if ( p.y - pt.x < fdraw.top ) p.y = fdraw.top + pt.x * 2; else {
+				if ( p.y + pt.x > fdraw.bottom ) p.y = fdraw.bottom; else p.y += pt.x;
+			}
+			TextOut( hdc, (int)fdraw.left - D, (int)p.y, ws, n );
 		}
-		TextOut( hdc, (int)fdraw.left - D, (int)p.y, ws, n );
-	}
-	if ( fColored ) {
-		// revert gray to black
-		SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
-		SetTextColor( hdc, RGB( 0, 0, 0 ) );
+		if ( fColored ) {
+			// revert gray to black
+			SelectObject( hdc, hpen[ 1 ] );    npen = (WORD)1;
+			SetTextColor( hdc, RGB( 0, 0, 0 ) );
+		}
 	}
 
 	// draw reper points
-	lplfRep->lfEscapement = lplfRep->lfOrientation = 0;
-	hfont = CreateFontIndirect( lplfRep );
-	DeleteObject( SelectObject( hdc, hfont ) );
-	SetTextAlign( hdc, TA_LEFT | TA_TOP );
-	GetTextMetrics( hdc, &tm );
-	SelectObject( hdc, hpen[ 2 ] );
-	SelectObject( hdc, GetStockObject( HOLLOW_BRUSH ) );
-	for ( lpri = GetRootRep(); lpri; lpri = lpri->next ) {     // loop for .rep files
-		if ( lpri->dp < (long)(pw.y*LEGACY_STEP_SCALE) ) continue;
-		lprp = (reppoint_P)( lpri + 1 );
-		for ( T = (geo_t)lpri->points; T > 0L; --T, lprp++ ) {  // loop for rep. points
-			if (
-				lprp->pt.x > fmap.west &&
-				lprp->pt.x < fmap.east &&
-				lprp->pt.y > fmap.south &&
-				lprp->pt.y < fmap.north &&
-				lprp->dp >= (long)(pw.y*LEGACY_STEP_SCALE)
-			) {
-				g2d( &( lprp->pt ), &p );
-				if ( lprp->rsize ) {
-					Dtx = Drx * lprp->rsize / 100;    if ( !Dtx ) Dtx = 1;
-					Dty = Dry * lprp->rsize / 100;    if ( !Dty ) Dty = 1;
-					Ellipse( hdc, (int)p.x - Dtx, (int)p.y - Dty, (int)p.x + Dtx, (int)p.y + Dty );    // draw reper point
-				}
-				if ( ( lprp->dn >= (long)(pw.y*LEGACY_STEP_SCALE) ) && lprp->name ) {   // draw name
-					pt.x = pt.y = 0;	n = (int)wcslen( lprp->name );
-					GetTextExtentPoint( hdc, lprp->name, n, (LPSIZE)&pt );
-					i = (int)( p.y - Dry - D - pt.y + tm.tmDescent );
-					if ( i > fdraw.top ) p.y = i; else p.y += Dry;
-					if ( p.x + pt.x > fdraw.right ) p.x -= pt.x;
-					TextOut( hdc, (int)p.x, (int)p.y, lprp->name, n );
+	if ( what_draw & DRAW_REPERS ) {
+		lplfRep->lfEscapement = lplfRep->lfOrientation = 0;
+		hfont = CreateFontIndirect( lplfRep );
+		DeleteObject( SelectObject( hdc, hfont ) );
+		SetTextAlign( hdc, TA_LEFT | TA_TOP );
+		GetTextMetrics( hdc, &tm );
+		SelectObject( hdc, hpen[ 2 ] );
+		SelectObject( hdc, GetStockObject( HOLLOW_BRUSH ) );
+		for ( lpri = GetRootRep(); lpri; lpri = lpri->next ) {     // loop for .rep files
+			if ( lpri->dp < (long)( pw.y*LEGACY_STEP_SCALE ) ) continue;
+			lprp = (reppoint_P)( lpri + 1 );
+			for ( T = (geo_t)lpri->points; T > 0L; --T, lprp++ ) {  // loop for rep. points
+				if (
+					lprp->pt.x > fmap.west &&
+					lprp->pt.x < fmap.east &&
+					lprp->pt.y > fmap.south &&
+					lprp->pt.y < fmap.north &&
+					lprp->dp >= (long)( pw.y*LEGACY_STEP_SCALE )
+					) {
+					g2d( &( lprp->pt ), &p );
+					if ( lprp->rsize ) {
+						Dtx = Drx * lprp->rsize / 100;    if ( !Dtx ) Dtx = 1;
+						Dty = Dry * lprp->rsize / 100;    if ( !Dty ) Dty = 1;
+						Ellipse( hdc, (int)p.x - Dtx, (int)p.y - Dty, (int)p.x + Dtx, (int)p.y + Dty );    // draw reper point
+					}
+					if ( ( lprp->dn >= (long)( pw.y*LEGACY_STEP_SCALE ) ) && lprp->name ) {   // draw name
+						pt.x = pt.y = 0;	n = (int)wcslen( lprp->name );
+						GetTextExtentPoint( hdc, lprp->name, n, (LPSIZE)&pt );
+						i = (int)( p.y - Dry - D - pt.y + tm.tmDescent );
+						if ( i > fdraw.top ) p.y = i; else p.y += Dry;
+						if ( p.x + pt.x > fdraw.right ) p.x -= pt.x;
+						TextOut( hdc, (int)p.x, (int)p.y, lprp->name, n );
+					}
 				}
 			}
 		}
+		DeleteObject( SelectObject( hdc, GetStockObject( SYSTEM_FONT ) ) );
+		SetBkMode( hdc, OPAQUE );
 	}
-	DeleteObject( SelectObject( hdc, GetStockObject( SYSTEM_FONT ) ) );
-	SetBkMode( hdc, OPAQUE );
 
 	// pass #2 - draw mark points
-	e_fseek( &infile, 0L, SEEK_SET );
-	e_fgets( line_buf, sizeof( line_buf ) / sizeof( line_buf[ 0 ] ), &infile );
-	trimline( s = bow( line_buf ) );	/* skip title */
+	if ( what_draw & DRAW_MARKERS ) {
+		e_fseek( &infile, 0L, SEEK_SET );
+		e_fgets( line_buf, sizeof( line_buf ) / sizeof( line_buf[ 0 ] ), &infile );
+		trimline( s = bow( line_buf ) );	/* skip title */
 
-	for ( i = 0; !e_feof( &infile ); i++ ) {   // enumerate points
-		if ( !e_fgets( line_buf, sizeof( line_buf ) / sizeof( line_buf[ 0 ] ), &infile ) ) continue;
-		p.latitude = atogeo( s = bow( line_buf ) );
-		if ( !*s ) continue;
-		p.longitude = atogeo( s = nextw( s ) );
-		v = 1.0;
-		npen = 1;
-		s = nextw( s );
-		while ( *s ) {
-			if ( *s == '.' || isdigit( (int)(unsigned char)*s ) ) {
-				v = _wtof( s );
-				if ( v <= 0.0 ) v = 1.0; else if ( v < 0.1 ) v = 0.1; else if ( v > 10.0 ) v = 10.0;
-			} else if ( *s == '^' ) {
-				npen = _wtol( s + 1 );
-				if ( npen < 0 ) npen = 1;
-				else if ( npen > 4 && npen < 11 ) npen = 4;
-				else if ( npen > 14 ) npen = 14;
-			} else if ( *s == '#' || *s == ';' ) break;
+		for ( i = 0; !e_feof( &infile ); i++ ) {   // enumerate points
+			if ( !e_fgets( line_buf, sizeof( line_buf ) / sizeof( line_buf[ 0 ] ), &infile ) ) continue;
+			p.latitude = atogeo( s = bow( line_buf ) );
+			if ( !*s ) continue;
+			p.longitude = atogeo( s = nextw( s ) );
+			v = 1.0;
+			npen = 1;
 			s = nextw( s );
-		}
-		g2d( &p, &p );
-		/* draw data point on bitmap */
-		SelectObject( hdc, GetStockObject( npen > 10 ? LTGRAY_BRUSH : BLACK_BRUSH ) ); // gray or black brush
-		SelectObject( hdc, hpen[ npen > 10 ? 1 : 0 ] ); // black or white contour
-		switch ( npen ) {
-		case 0:
-			break;	/* none */
-		default:	/* 1,11 = circle */
-			Ellipse( hdc, iround( p.x - v * Dmx ), iround( p.y - v * Dmy ), iround( p.x + v * Dmx ), iround( p.y + v * Dmy ) );
-			break;
-		case 2:	case 12:/* 2,12 = square */
-			v *= 0.886227;
-			Rectangle( hdc, iround( p.x - v * Dmx ), iround( p.y - v * Dmy ), iround( p.x + v * Dmx ), iround( p.y + v * Dmy ) );
-			break;
-		case 3: case 13:/* 3 = rhomb */
-			{
-				POINT	apts[ 4 ];
-				v *= 1.4142135623730950488016887242097 * 0.886227;
-				apts[ 0 ].x = iround( p.x - v * Dmx );	apts[ 0 ].y = iround( p.y );
-				apts[ 1 ].x = iround( p.x );		apts[ 1 ].y = iround( p.y - v * Dmy );
-				apts[ 2 ].x = iround( p.x + v * Dmx );	apts[ 2 ].y = iround( p.y );
-				apts[ 3 ].x = iround( p.x );		apts[ 3 ].y = iround( p.y + v * Dmy );
-				Polygon( hdc, apts, 4 );
+			while ( *s ) {
+				if ( *s == '.' || isdigit( (int)(unsigned char)*s ) ) {
+					v = _wtof( s );
+					if ( v <= 0.0 ) v = 1.0; else if ( v < 0.1 ) v = 0.1; else if ( v > 10.0 ) v = 10.0;
+				} else if ( *s == '^' ) {
+					npen = _wtol( s + 1 );
+					if ( npen < 0 ) npen = 1;
+					else if ( npen > 4 && npen < 11 ) npen = 4;
+					else if ( npen > 14 ) npen = 14;
+				} else if ( *s == '#' || *s == ';' ) break;
+				s = nextw( s );
 			}
-			break;
-		case 4: case 14:/* 4 = triangle */
-			{
-				POINT	apts[ 3 ];
-				v *= 1.1026578096528985289355763961921;
-				apts[ 0 ].x = iround( p.x - v * Dmx );	apts[ 0 ].y = iround( p.y + 2 * 0.2887*v*Dmy );
-				apts[ 1 ].x = iround( p.x );		apts[ 1 ].y = iround( p.y - 2 * 0.57735*v*Dmy );
-				apts[ 2 ].x = iround( p.x + v * Dmx );	apts[ 2 ].y = iround( p.y + 2 * 0.2887*v*Dmy );
-				Polygon( hdc, apts, 3 );
+			g2d( &p, &p );
+			/* draw data point on bitmap */
+			SelectObject( hdc, GetStockObject( npen > 10 ? LTGRAY_BRUSH : BLACK_BRUSH ) ); // gray or black brush
+			SelectObject( hdc, hpen[ npen > 10 ? 1 : 0 ] ); // black or white contour
+			switch ( npen ) {
+			case 0:
+				break;	/* none */
+			default:	/* 1,11 = circle */
+				Ellipse( hdc, iround( p.x - v * Dmx ), iround( p.y - v * Dmy ), iround( p.x + v * Dmx ), iround( p.y + v * Dmy ) );
+				break;
+			case 2:	case 12:/* 2,12 = square */
+				v *= 0.886227;
+				Rectangle( hdc, iround( p.x - v * Dmx ), iround( p.y - v * Dmy ), iround( p.x + v * Dmx ), iround( p.y + v * Dmy ) );
+				break;
+			case 3: case 13:/* 3 = rhomb */
+				{
+					POINT	apts[ 4 ];
+					v *= 1.4142135623730950488016887242097 * 0.886227;
+					apts[ 0 ].x = iround( p.x - v * Dmx );	apts[ 0 ].y = iround( p.y );
+					apts[ 1 ].x = iround( p.x );		apts[ 1 ].y = iround( p.y - v * Dmy );
+					apts[ 2 ].x = iround( p.x + v * Dmx );	apts[ 2 ].y = iround( p.y );
+					apts[ 3 ].x = iround( p.x );		apts[ 3 ].y = iround( p.y + v * Dmy );
+					Polygon( hdc, apts, 4 );
+				}
+				break;
+			case 4: case 14:/* 4 = triangle */
+				{
+					POINT	apts[ 3 ];
+					v *= 1.1026578096528985289355763961921;
+					apts[ 0 ].x = iround( p.x - v * Dmx );	apts[ 0 ].y = iround( p.y + 2 * 0.2887*v*Dmy );
+					apts[ 1 ].x = iround( p.x );		apts[ 1 ].y = iround( p.y - 2 * 0.57735*v*Dmy );
+					apts[ 2 ].x = iround( p.x + v * Dmx );	apts[ 2 ].y = iround( p.y + 2 * 0.2887*v*Dmy );
+					Polygon( hdc, apts, 3 );
+				}
+				break;
 			}
-			break;
 		}
 	}
-
 	SelectObject( hdc, GetStockObject( BLACK_PEN ) );
 	for ( i = 0; i < sizeof( hpen ) / sizeof( hpen[ 0 ] ); i++ ) DeleteObject( hpen[ i ] );
 

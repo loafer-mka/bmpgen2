@@ -18,6 +18,15 @@
 
 #include "geo.h"
 
+typedef enum {
+	DRAW_ARCS = 1,
+	DRAW_MARKERS = 2,
+	DRAW_GRID = 4,
+	DRAW_REPERS = 8,
+
+	DRAW_ALL = DRAW_ARCS | DRAW_MARKERS | DRAW_GRID | DRAW_REPERS
+} drawings_t;
+
 // -------------------- prototypes of functions ------------------
 extern   HANDLE   hInstance;
 
@@ -29,7 +38,7 @@ int     MapDraw(
 	HDC hdc, wchar_t *fname, UINT encoding, UINT width, UINT height, int dpix, int dpiy,
 	int marksize, LPLOGFONT lplfMark, int lfMarkSize,
 	int repsize, LPLOGFONT lplfRep, int lfRepSize,
-	BOOL  fMetric, BOOL fColored
+	BOOL  fMetric, BOOL fColored, drawings_t what_draw
 );
 
 LRESULT	CALLBACK LoadingResultsProc( HWND hwnd, UINT wmsg, WPARAM wParam, LPARAM lParam );

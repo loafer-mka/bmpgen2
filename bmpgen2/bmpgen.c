@@ -67,14 +67,14 @@ static wchar_t    bmpgen[] = L"Bitmap Generator";
 
 // ----------------------- fill wanted map ------------------------------
 
-static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, UINT height, int DPIX, int DPIY, int marksize, int repsize )
+static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, UINT height, int DPIX, int DPIY, int marksize, int repsize, drawings_t what_draw )
 {
 	HDC      hcdc = (HDC)0L;
 	LPDIB    pdib = (LPDIB)0L;
 	HBITMAP  hbmpold = (HBITMAP)0L;
 
 	hcdc = CreateCompatibleDC( NULL );
-	if ( !hcdc ) {
+	if ( ! hcdc ) {
 		MessageBox( NULL, L"Cannot create intermediate DC", bmpgen, MB_OK | MB_ICONEXCLAMATION );
 		goto RETURN;
 	}
@@ -92,12 +92,25 @@ static LPDIB FillMap( LPWSTR infile, UINT encoding, HBITMAP *phbmp, UINT width, 
 
 	PatBlt( hcdc, 0, 0, width, height, PATCOPY );                 // fill white
 
-	if ( !MapDraw(
+	// does not work
+	//BITMAPINFO	bi;
+	//memset( &bi, 0, sizeof( bi ) );
+	//bi.bmiHeader.biSize = sizeof( BITMAPINFOHEADER );
+	//bi.bmiHeader.biWidth = 1;
+	//bi.bmiHeader.biHeight = 1;
+	//bi.bmiHeader.biPlanes = 1;
+	//bi.bmiHeader.biBitCount = 32;
+	//bi.bmiHeader.biCompression = BI_RGB;
+	//RGBQUAD alphaOpaque = { 0x00, 0x00, 0x00, 0xFF };	// SRCPAINT  (OR)
+	//RGBQUAD solidOpaque = { 0x7F, 0x7F, 0x7F, 0x00 };	// SRCAND    (AND)
+	//StretchDIBits( hcdc, 0, 0, pdib->biWidth, pdib->biHeight, 0, 0, 1, 1, &alphaOpaque, &bi, DIB_RGB_COLORS, SRCPAINT );
+
+	if ( ! MapDraw(
 		hcdc, infile, encoding,
 		width, height, dpix, dpiy,
 		marksize, &lfMark, lfMarkSize,
 		repsize, &lfRep, lfRepSize,
-		TRUE, nBppImage > 1
+		TRUE, nBppImage > 1, what_draw
 	) ) {
 		MessageBox( NULL, L"Cannot open data file", bmpgen, MB_OK | MB_ICONEXCLAMATION );
 		goto RETURN;
@@ -603,6 +616,7 @@ static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 	double      dx, dy;
 	HBITMAP     hbmp;
 	UINT        encoding;
+	drawings_t  what_draw;
 	UNUSED_ARG( codeNotify );
 
 	// we must pass focus to parent window before disabling current focused window 
@@ -662,11 +676,19 @@ static void OnDlgCommandRead( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 		break;
 	}
 
+	what_draw = 0;
+	if ( Button_GetCheck( GetDlgItem( hwnd, IDC_DRAW_ARCS ) ) ) what_draw |= DRAW_ARCS;
+	if ( Button_GetCheck( GetDlgItem( hwnd, IDC_DRAW_MARKERS ) ) ) what_draw |= DRAW_MARKERS;
+	if ( Button_GetCheck( GetDlgItem( hwnd, IDC_DRAW_REPERS ) ) ) what_draw |= DRAW_REPERS;
+	if ( Button_GetCheck( GetDlgItem( hwnd, IDC_DRAW_GRID ) ) ) what_draw |= DRAW_GRID;
+
 	pdib = FillMap(
 		infile, encoding, &hbmp, (UINT)cx, (UINT)cy, dpix, dpiy,
 		(int)GetDlgItemInt( hwnd, IDC_MARKSIZE, NULL, FALSE ),
-		(int)GetDlgItemInt( hwnd, IDC_REPSIZE, NULL, FALSE )
+		(int)GetDlgItemInt( hwnd, IDC_REPSIZE, NULL, FALSE ),
+		what_draw
 	);
+
 	if ( hbmp ) {
 		if ( fUpdatePicture ) {
 			HWND	hwndPreview = GetDlgItem( hwnd, IDC_BITMAP );
@@ -828,8 +850,8 @@ static void OnDlgCommandGetInput( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 static void OnDlgCommandGetOutput( HWND hwnd, HWND hwndCtl, UINT codeNotify )
 {
 	static OPENFILENAME  ofn;
-	wchar_t              fname[ 256 ];
-	wchar_t              dir[ 256 ];
+	wchar_t              fname[ 512 ];
+	wchar_t              dir[ 512 ];
 	wchar_t              *p;
 	UNUSED_ARG( codeNotify );
 	UNUSED_ARG( hwndCtl );
@@ -996,7 +1018,11 @@ static void OnDlgCommand( HWND hwnd, int id, HWND hwndCtl, UINT codeNotify )
 	case IDC_REPFONT:    OnDlgCommandRepFont( hwnd, hwndCtl, codeNotify ); break;
 	case IDC_UPDPICTURE: OnDlgCommandUpdatePicture( hwnd, hwndCtl, codeNotify ); break;
 	case IDC_BPP:        OnDlgCommandBppImage( hwnd, hwndCtl, codeNotify ); break;
-	default:          break;
+	case IDC_DRAW_ARCS:
+	case IDC_DRAW_MARKERS:
+	case IDC_DRAW_REPERS:
+	case IDC_DRAW_GRID:  break;
+	default:             break;
 	}
 }
 
@@ -1083,6 +1109,11 @@ static BOOL OnDlgInitDialog( HWND hwnd, HWND hwndFocus, LPARAM lParam )
 	}
 	ComboBox_SetCurSel( hw, y );
 	OnDlgCommandBppImage( hwnd, hw, 0 );
+
+	Button_SetCheck( GetDlgItem( hwnd, IDC_DRAW_ARCS ), TRUE );
+	Button_SetCheck( GetDlgItem( hwnd, IDC_DRAW_MARKERS ), TRUE );
+	Button_SetCheck( GetDlgItem( hwnd, IDC_DRAW_REPERS ), TRUE );
+	Button_SetCheck( GetDlgItem( hwnd, IDC_DRAW_GRID ), TRUE );
 
 	// disable start and autostart options until maps loaded
 	CheckDlgItems( hwnd );
